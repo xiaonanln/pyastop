@@ -84,11 +84,12 @@ class ModuleASTOptimizer(ast.NodeTransformer):
 
 		print >>sys.stderr, 'Itering on %s' % expandIter
 		newBody = []
-		for iterVal in expandIter:
+		for i, iterVal in enumerate(expandIter):
 			# print >>sys.stderr, 'assigning', iterVal
 			assign = self.makeAssignStmt(node.target, iterVal)
 			newBody.append(assign)
 			newBody += node.body
+
 		return newBody
 
 	def makeExpr(self, pyval):
@@ -190,3 +191,23 @@ class ModuleASTOptimizer(ast.NodeTransformer):
 
 		return False
 
+	def isNameReferencedBy(self, name, node):
+		if isinstance(name, ast.Name):
+			name = name.id
+
+		assert isinstance(name, str), name
+
+		if isinstance(node, list):
+			for _stmt in node:
+				if self.isNameReferencedBy(name, _stmt):
+					return True
+			return False
+
+		if isinstance(node, ast.Name) and node.id == name:
+			return True
+
+		for f in getattr(node, '_fields', ()):
+			if self.containsStmt(filter, getattr(node, f)):
+				return True
+
+		return False
