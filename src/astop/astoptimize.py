@@ -7,6 +7,8 @@ import marshal
 from itertools import izip
 from collections import Counter
 
+from constfolding import ConstFoldingOptimizer
+
 import compileutils
 
 def astoptimize(sources):
@@ -35,9 +37,14 @@ def astoptimize(sources):
 	print >>sys.stderr, 'astop optimized %d sources' % optimizeCounter
 
 def optimizeModuleAST(moduleAST):
-	optimizer = ModuleASTOptimizer()
-	optModuleAST = optimizer.visit(moduleAST)
-	return optModuleAST if optimizer.optimized else moduleAST, optimizer.optimized
+	cfopter = ConstFoldingOptimizer()
+	optModuleAST = cfopter.visit(moduleAST)
+	moduleAST = optModuleAST if cfopter.optimized else moduleAST
+
+	maopter = ModuleASTOptimizer()
+	optModuleAST = maopter.visit(moduleAST)
+	moduleAST = optModuleAST if maopter.optimized else moduleAST
+	return moduleAST, cfopter.optimized or maopter.optimized
 
 
 class ModuleASTOptimizer(ast.NodeTransformer):
