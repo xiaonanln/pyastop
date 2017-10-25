@@ -23,3 +23,10 @@ def test1():
 
 def eval0():
 	return 100
+
+class ExampleClass1(object):
+	def __init__(self):
+		pass
+
+	def exampleInlineMethod1(self):
+		pass

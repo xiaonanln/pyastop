@@ -26,7 +26,7 @@ def astoptimize(sources):
 		# print 'compile AST to code:', code
 		optCode = codegen.to_source(moduleAST)
 		optCode = '# code optimized by pyastop\n' + optCode
-		with open(src  + 'astop', 'wb') as outputfd:
+		with open(src  + 'ao', 'wb') as outputfd:
 			outputfd.write(optCode)
 
 		code = compile(moduleAST, src, "exec")
