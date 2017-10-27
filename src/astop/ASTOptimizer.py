@@ -1,26 +1,30 @@
 import ast
 import sys
+import astutils
 
 class ASTOptimizer(ast.NodeTransformer):
 
 	def __init__(self):
 		super(ASTOptimizer, self).__init__()
-		self._optimized = False
+		self._optimized = 0
 
 	def visit(self, node):
 		"""Visit a node."""
-		if hasattr(node, 'lineno'):
-			self.currentPos = node
+		assert node is not None, node
+		self.currentPos = node
 
-		return super(ASTOptimizer, self).visit(node)
+		self.generic_visit(node)
+		node, optimized = self.optimize(node)
+		assert node is not None
+		if optimized: self._optimized += 1
+		return node
+
+	def optimize(self, node):
+		return node, False
 
 	@property
 	def optimized(self):
 		return self._optimized
-
-	@optimized.setter
-	def optimized(self, v):
-		self._optimized = v
 
 	@staticmethod
 	def node2str(node):
@@ -32,7 +36,7 @@ class ASTOptimizer(ast.NodeTransformer):
 		else:
 			return str(node)
 
-	def evalConstExpr(self, expr):
+	def evalConstExpr(self, expr, ctx=None):
 		setStmt = self.makeAssignStmt('_', expr)
 		module = ast.Module(body=[setStmt])
 		code = compile(module, '<evalExpr>', 'exec')
@@ -40,10 +44,7 @@ class ASTOptimizer(ast.NodeTransformer):
 		exec(code, G, L)
 		v = L['_']
 		# print 'evalConstExpr', type(v), repr(v)
-		if isinstance(v, int):
-			return self.makeNum(v)
-		else:
-			assert False, (type(v), v)
+		return self.py2ast(v, ctx=ctx)
 
 	def makeAssignStmt(self, name, expr):
 		if isinstance(name, str):
@@ -62,7 +63,6 @@ class ASTOptimizer(ast.NodeTransformer):
 		num = ast.Num(n)
 		return self._setCurrentPos(num)
 
-
 	def isNameEquals(self, node, name):
 		if isinstance(name, ast.Name):
 			name = name.id
@@ -77,3 +77,20 @@ class ASTOptimizer(ast.NodeTransformer):
 			node.lineno = node.col_offset = 0
 
 		return node
+
+	def py2ast(self, v, ctx=None):
+		node = ASTOptimizer._py2ast(v, ctx)
+		self._setCurrentPos(node)
+		ast.fix_missing_locations(node)
+		return node
+
+	@staticmethod
+	def _py2ast(v, ctx):
+		if isinstance(v, (int, long, float)):
+			return ast.Num(v)
+		elif isinstance(v, str):
+			return ast.Str(v)
+		elif isinstance(v, list):
+			return ast.List([ASTOptimizer._py2ast(x, ctx) for x in v], ctx)
+		else:
+			assert False, ('_py2ast', v)

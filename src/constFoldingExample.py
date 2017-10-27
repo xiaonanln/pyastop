@@ -1,12 +1,12 @@
 
-a = 1 + 1
-a = (1+1) - (1+1)
 a = (1+1) + (1-1) + (1*1) + (1/1)
-# a = bool(1)
-a = 1 and 2 or 3
-a = 1 and 2 and 3
-# a = len("123")
+a = 1 and 2 and 3 or 4 and 5
+a = ([1,2,3]) and  1 or 5
+
+a = [1 for i in xrange(3)]
+a = len("123")
+a = bool(100)
+a = [3.1416 * i for i in (1,2,3)]
+a = [3.1416 * a for (a, b) in ((1,1), (2,2), (3,3))]
 # a = 123
 # a = "abc"
-#
-#

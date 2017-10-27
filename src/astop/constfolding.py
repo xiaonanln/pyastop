@@ -1,58 +1,25 @@
 
 import ast
+import astutils
 from ASTOptimizer import ASTOptimizer
 
 class ConstFoldingOptimizer(ASTOptimizer):
 	def __init__(self):
 		super(ConstFoldingOptimizer, self).__init__()
 
-	def visit_BoolOp(self, node):
-		print 'const folding BoolOp:', self.node2str(node)
-		return self.constFoldingBoolOp(node)
+	def optimize(self, node):
+		# print 'optimize', ast.dump(node)
+		if not astutils.isexpr(node):
+			return node, False
 
-	def visit_BinOp(self, node):
-		print 'const folding BinOp:', self.node2str(node)
-		return self.constFoldingBinOp(node)
+		if astutils.isConstantExpr(node) and self.isConstFoldableExpr(node):
+			node = self.evalConstExpr(node, ctx=getattr(node, 'ctx', None))
+			return node, True
+		else:
+			return node, False
 
-	def visit_Num(self, node):
-		return node
-
-	def visit_Str(self, node):
-		return node
-
-	def constFoldingBoolOp(self, node):
-		# BoolOp(boolop op, expr* values)
-		node.values = [self.constFoldingExpr(expr) for expr in node.values]
-		for expr in node.values:
-			if not self.isConstant(expr):
-				return node # const folding fialed
-
-		self.optimized = True
-		return self.evalConstExpr(node)
-
-	def constFoldingBinOp(self, node):
-		# BinOp(expr left, operator op, expr right)
-		node.left = self.constFoldingExpr(node.left)
-		node.right = self.constFoldingExpr(node.right)
-		if not self.isConstant(node.left) or not self.isConstant(node.right):
-			return node
-		self.optimized = True
-		return self.evalConstExpr(node)
-
-	def constFoldingNum(self, node):
-		return node
-
-	def constFoldingExpr(self, node):
-		type = node.__class__.__name__
-		return getattr(self, 'constFolding' + type)(node)
-
-	def isConstant(self, expr):
-		if isinstance(expr, ast.Num):
-			return True
-		elif isinstance(expr, ast.Str):
-			return True
-
-		return False
+	def isConstFoldableExpr(self, node):
+			return isinstance(node, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.IfExp, ast.Compare, ast.Call))
 
 	# expr = BoolOp(boolop op, expr* values)
 	#      | BinOp(expr left, operator op, expr right)

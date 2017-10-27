@@ -19,11 +19,11 @@ def astoptimize(sources):
 	moduleASTs = [optimizeModuleAST( moduleAST ) for moduleAST in moduleASTs] # optimize module
 
 	optimizeCounter = 0
-	for src, (moduleAST, optimized) in izip( sources, moduleASTs ):
-		if not optimized: continue
+	for src, (moduleAST, optimizeCount) in izip( sources, moduleASTs ):
+		if not optimizeCount: continue
 
-		optimizeCounter += 1
-		print >>sys.stderr, "%s is optimized!" % src
+		optimizeCounter += optimizeCount
+		print >>sys.stderr, "%s is optimized in %d places" % (src, optimizeCount)
 
 		# print 'compile AST to code:', code
 		optCode = codegen.to_source(moduleAST)
@@ -44,8 +44,7 @@ def optimizeModuleAST(moduleAST):
 	maopter = ModuleASTOptimizer()
 	optModuleAST = maopter.visit(moduleAST)
 	moduleAST = optModuleAST if maopter.optimized else moduleAST
-	return moduleAST, cfopter.optimized or maopter.optimized
-
+	return moduleAST, cfopter.optimized + maopter.optimized
 
 class ModuleASTOptimizer(ast.NodeTransformer):
 
@@ -89,7 +88,6 @@ class ModuleASTOptimizer(ast.NodeTransformer):
 		if len(expandIter) > 10:
 			return
 
-		print >>sys.stderr, 'Itering on %s' % expandIter
 		newBody = []
 		for i, iterVal in enumerate(expandIter):
 			# print >>sys.stderr, 'assigning', iterVal
