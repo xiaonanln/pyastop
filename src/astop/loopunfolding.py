@@ -35,7 +35,7 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 		if not ok:
 			return
 
-		print [ast.dump(it) for it in expandIter]
+		# print [ast.dump(it) for it in expandIter]
 		if len(expandIter) > 10:
 			return
 
@@ -49,7 +49,7 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 		return newBody
 
 	def expandIterExpr(self, iter):
-		print 'expandIterExpr', ast.dump(iter)
+		# print 'expandIterExpr', ast.dump(iter)
 		# self.dump(iter)
 		if isinstance(iter, ast.Call):
 			# self.dump(iter.func)
@@ -63,6 +63,3 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 			return iter.keys, True
 
 		return None, False
-
-	def visit_stmt(self, stmt):
-		print >>sys.stderr, 'current stmt:', stmt

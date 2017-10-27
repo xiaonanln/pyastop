@@ -7,6 +7,7 @@ from constfolding import ConstFoldingASTOptimizer
 from funcargsunfolding import FuncArgsUnfoldingASTOptimizer
 from inlining import InliningASTOptimizer
 from loopunfolding import LoopUnfoldingASTOptimizer
+from deadcodeeliminating import DeadCodeEliminatingASTOptimizer
 
 
 def astoptimize(sources):
@@ -36,10 +37,12 @@ def astoptimize(sources):
 
 def optimizeModuleAST(moduleAST):
 	totalOptimizeCount = 0
-	for optimizerClass in (ConstFoldingASTOptimizer,
-	                  LoopUnfoldingASTOptimizer,
-	                  FuncArgsUnfoldingASTOptimizer,
-	                  InliningASTOptimizer):
+	for optimizerClass in (
+			ConstFoldingASTOptimizer,
+			LoopUnfoldingASTOptimizer,
+			FuncArgsUnfoldingASTOptimizer,
+			DeadCodeEliminatingASTOptimizer,
+			InliningASTOptimizer):
 
 		optimizer = optimizerClass()
 		optModuleAST = optimizer.visit(moduleAST)
