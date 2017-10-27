@@ -9,6 +9,7 @@ from collections import Counter
 
 from constfolding import ConstFoldingASTOptimizer
 from loopunfolding import LoopUnfoldingASTOptimizer
+from funcargsunfolding import FuncArgsUnfoldingASTOptimizer
 from inlining import InliningASTOptimizer
 
 import compileutils
@@ -39,16 +40,16 @@ def astoptimize(sources):
 	print >>sys.stderr, 'astop optimized %d sources' % optimizeCounter
 
 def optimizeModuleAST(moduleAST):
-	cfopter = ConstFoldingASTOptimizer()
-	optModuleAST = cfopter.visit(moduleAST)
-	moduleAST = optModuleAST if cfopter.optimized else moduleAST
+	totalOptimizeCount = 0
+	for optimizerClass in (ConstFoldingASTOptimizer,
+	                  LoopUnfoldingASTOptimizer,
+	                  FuncArgsUnfoldingASTOptimizer,
+	                  InliningASTOptimizer):
 
-	maopter = LoopUnfoldingASTOptimizer()
-	optModuleAST = maopter.visit(moduleAST)
-	moduleAST = optModuleAST if maopter.optimized else moduleAST
+		optimizer = optimizerClass()
+		optModuleAST = optimizer.visit(moduleAST)
+		if optimizer.optimized:
+			moduleAST = optModuleAST
+			totalOptimizeCount += optimizer.optimized
 
-	inopter = InliningASTOptimizer()
-	optModuleAST = inopter.visit(moduleAST)
-	moduleAST = optModuleAST if inopter.optimized else moduleAST
-
-	return moduleAST, cfopter.optimized + maopter.optimized + inopter.optimized
+	return moduleAST, totalOptimizeCount

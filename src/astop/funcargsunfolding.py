@@ -2,7 +2,7 @@
 import ast
 from BaseASTOptimizer import BaseASTOptimizer
 
-class InliningASTOptimizer(BaseASTOptimizer):
+class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 
 	def optimize(self, node):
 		if not isinstance(node, ast.Call):
@@ -11,6 +11,5 @@ class InliningASTOptimizer(BaseASTOptimizer):
 		# Call(expr func, expr * args, keyword * keywords, expr? starargs, expr? kwargs)
 
 		return node, False
-
 
 
