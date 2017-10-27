@@ -2,16 +2,16 @@ import ast
 import sys
 import astutils
 
-class ASTOptimizer(ast.NodeTransformer):
+class BaseASTOptimizer(ast.NodeTransformer):
 
 	def __init__(self):
-		super(ASTOptimizer, self).__init__()
+		super(BaseASTOptimizer, self).__init__()
 		self._optimized = 0
 
 	def visit(self, node):
 		"""Visit a node."""
-		assert node is not None, node
-		self.currentPos = node
+		if isinstance(node, ast.AST) and hasattr(node, 'lineno'):
+			self.currentPos = node
 
 		self.generic_visit(node)
 		node, optimized = self.optimize(node)
@@ -30,9 +30,9 @@ class ASTOptimizer(ast.NodeTransformer):
 	def node2str(node):
 		if hasattr(node, '_fields'):
 			name = node.__class__.__name__
-			return name + '<' + ', '.join('%s=%s' % (f, ASTOptimizer.node2str(getattr(node, f))) for f in node._fields) + '>'
+			return name + '<' + ', '.join('%s=%s' % (f, BaseASTOptimizer.node2str(getattr(node, f))) for f in node._fields) + '>'
 		elif isinstance(node, list):
-			return [ASTOptimizer.node2str(n) for n in node]
+			return [BaseASTOptimizer.node2str(n) for n in node]
 		else:
 			return str(node)
 
@@ -73,16 +73,15 @@ class ASTOptimizer(ast.NodeTransformer):
 		if self.currentPos is not None:
 			node.lineno = self.currentPos.lineno
 			node.col_offset = self.currentPos.col_offset
+			ast.fix_missing_locations(node)
 		else:
 			node.lineno = node.col_offset = 0
 
 		return node
 
 	def py2ast(self, v, ctx=None):
-		node = ASTOptimizer._py2ast(v, ctx)
-		self._setCurrentPos(node)
-		ast.fix_missing_locations(node)
-		return node
+		node = BaseASTOptimizer._py2ast(v, ctx)
+		return self._setCurrentPos(node)
 
 	@staticmethod
 	def _py2ast(v, ctx):
@@ -91,6 +90,51 @@ class ASTOptimizer(ast.NodeTransformer):
 		elif isinstance(v, str):
 			return ast.Str(v)
 		elif isinstance(v, list):
-			return ast.List([ASTOptimizer._py2ast(x, ctx) for x in v], ctx)
+			return ast.List([BaseASTOptimizer._py2ast(x, ctx) for x in v], ctx)
 		else:
 			assert False, ('_py2ast', v)
+
+	def isContinueStmt(self, stmt):
+		return isinstance(stmt, ast.Continue)
+
+	def isBreakStmt(self, stmt):
+		return isinstance(stmt, ast.Break)
+
+	def containsStmt(self, filter, stmts):
+		if isinstance(stmts, list):
+			for stmt in stmts:
+				if self.containsStmt(filter, stmt):
+					return True
+
+			return False
+
+		stmt = stmts
+		if filter(stmt):
+			return True
+
+		for f in getattr(stmt, '_fields', ()):
+			if self.containsStmt(filter, getattr(stmt, f)):
+				return True
+
+		return False
+
+	def isNameReferencedBy(self, name, node):
+		if isinstance(name, ast.Name):
+			name = name.id
+
+		assert isinstance(name, str), name
+
+		if isinstance(node, list):
+			for _stmt in node:
+				if self.isNameReferencedBy(name, _stmt):
+					return True
+			return False
+
+		if isinstance(node, ast.Name) and node.id == name:
+			return True
+
+		for f in getattr(node, '_fields', ()):
+			if self.containsStmt(filter, getattr(node, f)):
+				return True
+
+		return False

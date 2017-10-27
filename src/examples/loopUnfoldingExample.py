@@ -20,6 +20,17 @@ def test1():
 	for i in xrange(N):
 		print i
 
+	for i in (1,2,3):
+		print i
+
+	for i in {1:1, 2:2, 3:3}:
+		print i
+
+	for i in set([1,2,3]):
+		print i
+
+	for i in [1,2,3]:
+		print i
 
 def eval0():
 	return 100

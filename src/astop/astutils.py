@@ -88,3 +88,10 @@ def isConstantExpr(expr):
 def isConstComprehension(comp):
 	return all(isConstantExpr(e) for e in [comp.target, comp.iter] + comp.ifs)
 
+def evalLen(expr):
+	if isinstance(expr, (ast.List, ast.Tuple, ast.Set)):
+		return len(expr.elts), True
+	elif isinstance(expr, ast.Dict):
+		return len(expr.keys), True
+
+	return None, False

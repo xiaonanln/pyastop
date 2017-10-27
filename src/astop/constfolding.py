@@ -1,11 +1,11 @@
 
 import ast
 import astutils
-from ASTOptimizer import ASTOptimizer
+from BaseASTOptimizer import BaseASTOptimizer
 
-class ConstFoldingOptimizer(ASTOptimizer):
+class ConstFoldingASTOptimizer(BaseASTOptimizer):
 	def __init__(self):
-		super(ConstFoldingOptimizer, self).__init__()
+		super(ConstFoldingASTOptimizer, self).__init__()
 
 	def optimize(self, node):
 		# print 'optimize', ast.dump(node)

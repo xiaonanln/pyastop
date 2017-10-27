@@ -3,7 +3,8 @@
 ### Major targets of pyastop AST optimizations
 1. Constant folding
 2. Loop unfolding
-3. Small function inlining
+3. Dead code eliminating
+4. Small function inlining
 
 ### Full project analysis
 Analyze all Python sources in the whole project to help aid AST optimization. 
