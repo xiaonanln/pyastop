@@ -1,18 +1,13 @@
 import sys
-import ast
-import time
-import py_compile
-import codegen
-import marshal
 from itertools import izip
-from collections import Counter
-
-from constfolding import ConstFoldingASTOptimizer
-from loopunfolding import LoopUnfoldingASTOptimizer
-from funcargsunfolding import FuncArgsUnfoldingASTOptimizer
-from inlining import InliningASTOptimizer
 
 import compileutils
+from astop import codegen
+from constfolding import ConstFoldingASTOptimizer
+from funcargsunfolding import FuncArgsUnfoldingASTOptimizer
+from inlining import InliningASTOptimizer
+from loopunfolding import LoopUnfoldingASTOptimizer
+
 
 def astoptimize(sources):
 	print >>sys.stderr, 'ast optimizeing %d sources ...' % len(sources)
