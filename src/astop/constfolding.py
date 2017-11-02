@@ -4,6 +4,8 @@ import astutils
 from BaseASTOptimizer import BaseASTOptimizer
 
 class ConstFoldingASTOptimizer(BaseASTOptimizer):
+	RequireNameScope = True
+
 	def __init__(self):
 		super(ConstFoldingASTOptimizer, self).__init__()
 
@@ -12,11 +14,13 @@ class ConstFoldingASTOptimizer(BaseASTOptimizer):
 		if not astutils.isexpr(node):
 			return node, False
 
-		if astutils.isConstantExpr(node) and self.isConstFoldableExpr(node):
-			node = self.evalConstExpr(node, ctx=getattr(node, 'ctx', None))
-			return node, True
-		else:
-			return node, False
+		if self.isConstFoldableExpr(node):
+			print 'const folding expr', ast.dump(node), 'isConstantExpr', self.currentScope.isConstantExpr(node), "locals", self.currentScope.locals
+			if self.currentScope.isConstantExpr(node):
+				node = self.evalConstExpr(node, ctx=getattr(node, 'ctx', None))
+				return node, True
+
+		return node, False
 
 	def isConstFoldableExpr(self, node):
 			return isinstance(node, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.IfExp, ast.Compare, ast.Call))

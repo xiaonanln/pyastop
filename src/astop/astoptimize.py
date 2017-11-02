@@ -3,7 +3,7 @@ from itertools import izip
 
 import compileutils
 from astop import codegen
-from globalanalyze import GlobalAnalyzeVisitor
+# from globalanalyze import GlobalAnalyzeVisitor
 from constfolding import ConstFoldingASTOptimizer
 from funcargsunfolding import FuncArgsUnfoldingASTOptimizer
 from inlining import InliningASTOptimizer
@@ -41,8 +41,9 @@ def astoptimize(sources):
 	print >>sys.stderr, 'astop optimized %d sources' % optimizeCounter
 
 def analyzeModuleAST(moduleAST):
-	analyzer = GlobalAnalyzeVisitor()
-	analyzer.visit(moduleAST)
+	pass
+	# analyzer = GlobalAnalyzeVisitor()
+	# analyzer.visit(moduleAST)
 
 def optimizeModuleAST(moduleAST):
 	totalOptimizeCount = 0

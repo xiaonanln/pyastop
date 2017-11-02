@@ -14,38 +14,15 @@ def children(node):
 		else:
 			yield c
 
-	# expr = BoolOp(boolop op, expr* values)
-	#      | BinOp(expr left, operator op, expr right)
-	#      | UnaryOp(unaryop op, expr operand)
-	#      | Lambda(arguments args, expr body)
-	#      | IfExp(expr test, expr body, expr orelse)
-	#      | Dict(expr* keys, expr* values)
-	#      | Set(expr* elts)
-	#      | ListComp(expr elt, comprehension* generators)
-	#      | SetComp(expr elt, comprehension* generators)
-	#      | DictComp(expr key, expr value, comprehension* generators)
-	#      | GeneratorExp(expr elt, comprehension* generators)
-	#      -- the grammar constrains where yield expressions can occur
-	#      | Yield(expr? value)
-	#      -- need sequences for compare to distinguish between
-	#      -- x < 4 < 3 and (x < 4) < 3
-	#      | Compare(expr left, cmpop* ops, expr* comparators)
-	#      | Call(expr func, expr* args, keyword* keywords,
-	# 		 expr? starargs, expr? kwargs)
-	#      | Repr(expr value)
-	#      | Num(object n) -- a number as a PyObject.
-	#      | Str(string s) -- need to specify raw, unicode, etc?
-	#      -- other literals? bools?
-	#
-	#      -- the following expression can appear in assignment context
-	#      | Attribute(expr value, identifier attr, expr_context ctx)
-	#      | Subscript(expr value, slice slice, expr_context ctx)
-	#      | Name(identifier id, expr_context ctx)
-	#      | List(expr* elts, expr_context ctx)
-	#      | Tuple(expr* elts, expr_context ctx)
-	#
-	#       -- col_offset is the byte offset in the utf8 string the parser uses
-	#       attributes (int lineno, int col_offset)
+def subexprs(expr):
+	if isinstance(expr, ast.BoolOp):
+		return expr.values
+	elif isinstance(expr, ast.BinOp):
+		return [expr.left, expr.right]
+	elif isinstance(expr, ast.UnaryOp):
+		return [expr.operand]
+	elif isinstance(ast.Lambda):
+		pass
 
 def isexpr(node):
 	return isinstance(node, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.Lambda, ast.IfExp, ast.Dict, ast.Set,
@@ -53,40 +30,8 @@ def isexpr(node):
 	                         ast.Repr, ast.Num, ast.Str, ast.Attribute, ast.Subscript, ast.Name, ast.List, ast.Tuple
 	                         ))
 
-def isConstantExpr(expr):
-	if isinstance(expr, ast.Num):
-		return True
-	elif isinstance(expr, ast.Str):
-		return True
-	elif isinstance(expr, ast.BoolOp):
-		return all( isConstantExpr(e) for e in expr.values )
-	elif isinstance(expr, ast.BinOp):
-		return all( isConstantExpr(e) for e in (expr.left, expr.right) )
-	elif isinstance(expr, ast.UnaryOp):
-		return isConstantExpr(expr.operand)
-	elif isinstance(expr, ast.IfExp):
-		return all(isConstantExpr(e) for e in (expr.test, expr.body, expr.orelse))
-	elif isinstance(expr, ast.Dict):
-		return all(isConstantExpr(e) for e in (expr.keys + expr.values))
-	elif isinstance(expr, ast.Set):
-		return all(isConstantExpr(e) for e in expr.elts)
-	elif isinstance(expr, ast.Compare):
-		return all(isConstantExpr(e) for e in [expr.left] + expr.comparators)
-	elif isinstance(expr, (ast.List, ast.Tuple)):
-		return all(isConstantExpr(e) for e in expr.elts)
-	# elif isinstance(expr, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
-	# 	# | ListComp(expr elt, comprehension * generators)
-	# 	# | SetComp(expr elt, comprehension * generators)
-	# 	# | GeneratorExp(expr elt, comprehension * generators)
-	# 	return isConstantExpr(expr.elt) and all(isConstComprehension(c) for c in expr.generators)
-	# elif isinstance(expr, ast.DictComp):
-	# 	# | DictComp(expr key, expr value, comprehension * generators)
-	# 	return isConstantExpr(expr.key) and isConstantExpr(expr.value) and all(isConstComprehension(c) for c in expr.generators)
-
-	return False
-
-def isConstComprehension(comp):
-	return all(isConstantExpr(e) for e in [comp.target, comp.iter] + comp.ifs)
+# def isConstComprehension(comp):
+# 	return all(isConstantExpr(e) for e in [comp.target, comp.iter] + comp.ifs)
 
 def evalLen(expr):
 	if isinstance(expr, (ast.List, ast.Tuple, ast.Set)):
@@ -95,3 +40,86 @@ def evalLen(expr):
 		return len(expr.keys), True
 
 	return None, False
+
+def substmts(stmt):
+	"""Get all direct sub statements"""
+	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally, ast.ExceptHandler)):
+		for ss in stmt.body:
+			yield ss
+
+	if isinstance(stmt, (ast.For, ast.While, ast.If, ast.TryExcept)):
+		for ss in stmt.orelse:
+			yield ss
+
+	if isinstance(stmt, ast.TryFinally):
+		for ss in stmt.finalbody:
+			yield ss
+
+	return
+
+_emptySet = frozenset()
+def nameUsageInStmt(stmt):
+	if isinstance(stmt, ast.FunctionDef):
+		return set([stmt.identifier.id]), namesUsedInExprs(stmt.decorator_list)
+	elif isinstance(stmt, ast.ClassDef):
+		return set([stmt.identifier.id]), namesUsedInExprs(stmt.bases + stmt.decorator_list)
+	elif isinstance(stmt, ast.Return):
+		return _emptySet, namesUsedInExpr(stmt.value) if stmt.value is not None else set()
+	elif isinstance(stmt, ast.Delete):
+		return _emptySet, namesUsedInExprs(stmt.targets)
+	elif isinstance(stmt, ast.Assign):
+		pass
+
+def namesAssigned(expr):
+	pass
+
+def namesUsedInExpr(expr):
+	if isinstance(expr, ast.BoolOp):
+		return namesUsedInExprs(expr.values)
+	elif isinstance(ast.BinOp):
+		return namesUsedInExprs([expr.left, expr.right])
+	elif isinstance(ast.UnaryOp):
+		pass
+
+def namesUsedInExprs(exprs):
+	names = set()
+	for expr in exprs:
+		names |= namesUsedInExpr(expr)
+	return names
+
+
+	# stmt = FunctionDef(identifier name, arguments args,
+     #                        stmt* body, expr* decorator_list)
+	#       | ClassDef(identifier name, expr* bases, stmt* body, expr* decorator_list)
+	#       | Return(expr? value)
+    #
+	#       | Delete(expr* targets)
+	#       | Assign(expr* targets, expr value)
+	#       | AugAssign(expr target, operator op, expr value)
+    #
+	#       -- not sure if bool is allowed, can always use int
+ 	#       | Print(expr? dest, expr* values, bool nl)
+    #
+	#       -- use 'orelse' because else is a keyword in target languages
+	#       | For(expr target, expr iter, stmt* body, stmt* orelse)
+	#       | While(expr test, stmt* body, stmt* orelse)
+	#       | If(expr test, stmt* body, stmt* orelse)
+	#       | With(expr context_expr, expr? optional_vars, stmt* body)
+    #
+	#       -- 'type' is a bad name
+	#       | Raise(expr? type, expr? inst, expr? tback)
+	#       | TryExcept(stmt* body, excepthandler* handlers, stmt* orelse)
+	#       | TryFinally(stmt* body, stmt* finalbody)
+	#       | Assert(expr test, expr? msg)
+    #
+	#       | Import(alias* names)
+	#       | ImportFrom(identifier? module, alias* names, int? level)
+    #
+	#       -- Doesn't capture requirement that locals must be
+	#       -- defined if globals is
+	#       -- still supports use as a function!
+	#       | Exec(expr body, expr? globals, expr? locals)
+    #
+	#       | Global(identifier* names)
+	#       | Expr(expr value)
+	#       | Pass | Break | Continue

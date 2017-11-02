@@ -2,22 +2,52 @@ import ast
 import sys
 import astutils
 
+import namescope
+
+
 class BaseASTOptimizer(ast.NodeTransformer):
+
+	RequireNameScope = False # if set to True, will analyze Name Scope before optimize
 
 	def __init__(self):
 		super(BaseASTOptimizer, self).__init__()
 		self._optimized = 0
+		if self.RequireNameScope:
+			self.currentScope = namescope.builtinsNameScope
 
 	def visit(self, node):
 		"""Visit a node."""
 		if isinstance(node, ast.AST) and hasattr(node, 'lineno'):
 			self.currentPos = node
 
-		self.generic_visit(node)
+		if self.RequireNameScope:
+			if isinstance(node, ast.Module):
+				self.currentScope = namescope.newGlobalNameScope()
+				self.currentScope.visitModuleBody(node)
+			elif isinstance(node, ast.ClassDef):
+				self.currentScope = namescope.NameScope(self.currentScope)
+				self.currentScope.visitClassBody(node)
+			elif isinstance(node, ast.FunctionDef):
+				self.currentScope = namescope.NameScope(self.currentScope)
+				self.currentScope.visitFunctionBody(node)
+
+		self.optimizeChildren(node) # optimize children before optimizing parent node
 		node, optimized = self.optimize(node)
 		assert node is not None
 		if optimized: self._optimized += 1
+
+		if self.RequireNameScope:
+			if isinstance(node, ast.Module):
+				self.currentScope = self.currentScope.parent
+			elif isinstance(node, ast.ClassDef):
+				self.currentScope = self.currentScope.parent
+			elif isinstance(node, ast.FunctionDef):
+				self.currentScope = self.currentScope.parent
+
 		return node
+
+	def optimizeChildren(self, node):
+		self.generic_visit(node)
 
 	def optimize(self, node):
 		return node, False
