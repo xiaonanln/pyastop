@@ -15,7 +15,6 @@ class ConstFoldingASTOptimizer(BaseASTOptimizer):
 			return node, False
 
 		if self.isConstFoldableExpr(node):
-			print 'const folding expr', ast.dump(node), 'isConstantExpr', self.currentScope.isConstantExpr(node), "locals", self.currentScope.locals
 			if self.currentScope.isConstantExpr(node):
 				node = self.evalConstExpr(node, ctx=getattr(node, 'ctx', None))
 				return node, True

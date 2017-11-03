@@ -19,7 +19,6 @@ class NameScope(object):
 
 	def addGlobalName(self, name):
 		assert isinstance(name, str), name
-		print 'global %s' % name
 		self.globals.add(name)
 
 	def isGlobalScope(self):
@@ -49,7 +48,6 @@ class NameScope(object):
 		elif isinstance(stmt, ast.AugAssign):
 			self.visitAssignedNamesInExpr(stmt.target)
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-			print 'import', ast.dump(stmt)
 			for alias in stmt.names:
 				self.visitAssignedNamesInAlias(alias)
 
@@ -134,7 +132,6 @@ class NameScope(object):
 		elif isinstance(expr, ast.Call):
 			# Call(expr func, expr * args, keyword * keywords, expr? starargs, expr? kwargs)
 			# keyword = (identifier arg, expr value)
-			print 'const folding call', ast.dump(expr), 'isCallArgumentsConst', self.isCallArgumentsConst(expr), 'isConstToConstFunc', self.isConstToConstFunc(expr.func)
 			return self.isCallArgumentsConst(expr) and self.isConstToConstFunc(expr.func)
 
 		# elif isinstance(expr, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
@@ -189,7 +186,6 @@ class NameScope(object):
 		assert isinstance(name, str)
 		scope = self
 		while scope:
-			print 'scope', scope, scope.isBuiltinsScope(), name in scope.locals, name , name in scope.locals
 			if name in scope.locals:
 				return scope.isBuiltinsScope()
 			elif name in scope.globals:
