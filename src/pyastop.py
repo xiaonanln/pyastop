@@ -4,6 +4,11 @@ import argparse
 import sys
 import astop
 import os
+import ast
+
+c = ast.parse("[a.a,b.b,c.c] = 1,2,3", "noname")
+print dir(c)
+print ast.dump(c)
 
 def main():
 	args = parseArgs(sys.argv[1:])

@@ -34,3 +34,7 @@ def f1():
 f1()
 
 print g
+
+
+def py2ast():
+	a, b, c = 1, 2, 3

@@ -87,7 +87,6 @@ def namesUsedInExprs(exprs):
 		names |= namesUsedInExpr(expr)
 	return names
 
-
 	# stmt = FunctionDef(identifier name, arguments args,
      #                        stmt* body, expr* decorator_list)
 	#       | ClassDef(identifier name, expr* bases, stmt* body, expr* decorator_list)

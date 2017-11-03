@@ -7,6 +7,9 @@ from BaseASTOptimizer import BaseASTOptimizer
 
 class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 
+	CONST_FOLDABLE_BUILTIN_FUNCS = ('xrange', 'frozenset', 'reversed')
+	RequireNameScope = True
+
 	def __init__(self):
 		super(LoopUnfoldingASTOptimizer, self).__init__()
 
@@ -52,14 +55,19 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 		# print 'expandIterExpr', ast.dump(iter)
 		# self.dump(iter)
 		if isinstance(iter, ast.Call):
-			# self.dump(iter.func)
-			# if self.isNameEquals(iter.func, 'range') or self.isNameEquals(iter.func, 'xrange'):
-			# 	return 'abc'
-			return None, False
+			func = iter.func
+			if isinstance(func, ast.Name) and func.id in LoopUnfoldingASTOptimizer.CONST_FOLDABLE_BUILTIN_FUNCS and self.currentScope.isBuiltinName(func.id) and self.currentScope.isCallArgumentsConst(iter):
+				# for ... in xrange(...):
+				_list = self.evalConstExpr(ast.Call(self.makeName('list'), [iter], [], None, None))
+				return _list.elts, True
 
 		elif isinstance(iter, (ast.List, ast.Tuple, ast.Set)):
 			return iter.elts, True
 		elif isinstance(iter, ast.Dict):
 			return iter.keys, True
+		elif isinstance(iter, ast.Str):
+			return [ast.Str(c) for c in iter.s], True
 
 		return None, False
+
+

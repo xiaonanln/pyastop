@@ -66,15 +66,20 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		else:
 			return str(node)
 
-	def evalConstExpr(self, expr, ctx=None):
-		setStmt = self.makeAssignStmt('_', expr)
-		module = ast.Module(body=[setStmt])
-		code = compile(module, '<evalExpr>', 'exec')
-		G, L = {}, {}
-		exec(code, G, L)
-		v = L['_']
-		# print 'evalConstExpr', type(v), repr(v)
-		return self.py2ast(v, ctx=ctx)
+	def evalConstExpr(self, expr):
+		try:
+			setStmt = self.makeAssignStmt('_', expr)
+			module = ast.Module(body=[setStmt])
+			code = compile(module, '<evalExpr>', 'exec')
+			G, L = {}, {}
+			exec(code, G, L)
+			v = L['_']
+			# print 'evalConstExpr', type(v), repr(v)
+			return self.py2ast(v, ctx=ast.Load())
+		except:
+			print >>sys.stderr, 'eval const expr failed:', ast.dump(expr)
+			raise
+
 
 	def makeAssignStmt(self, name, expr):
 		if isinstance(name, str):
@@ -83,15 +88,18 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		assignStmt = ast.Assign(targets=[name], value=expr)
 		return self._setCurrentPos(assignStmt)
 
-	def makeName(self, id, ctx):
+	def makeName(self, id, ctx=None):
 		assert isinstance(id, str)
-		name = ast.Name(id=id, ctx=ctx)
+		name = ast.Name(id=id, ctx=ctx or ast.Load())
 		return self._setCurrentPos(name)
 
 	def makeNum(self, n):
 		assert isinstance(n, int)
 		num = ast.Num(n)
 		return self._setCurrentPos(num)
+
+	# def makeCall(self, func, args):
+	# 	assert isinstance(func, str)
 
 	def isNameEquals(self, node, name):
 		if isinstance(name, ast.Name):
@@ -121,6 +129,9 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			return ast.Str(v)
 		elif isinstance(v, list):
 			return ast.List([BaseASTOptimizer._py2ast(x, ctx) for x in v], ctx)
+		elif isinstance(v, set):
+			assert isinstance(ctx, ast.Load)
+			return ast.Set([BaseASTOptimizer._py2ast(x, ctx) for x in v])
 		else:
 			assert False, ('_py2ast', v)
 

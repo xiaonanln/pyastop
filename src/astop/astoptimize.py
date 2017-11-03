@@ -1,4 +1,5 @@
 import sys
+import ast
 from itertools import izip
 
 import compileutils
@@ -32,9 +33,11 @@ def astoptimize(sources):
 		# print 'compile AST to code:', code
 		optCode = codegen.to_source(moduleAST)
 		optCode = '# code optimized by pyastop\n' + optCode
+
 		with open(src  + 'ao', 'wb') as outputfd:
 			outputfd.write(optCode)
 
+		checkExprContext(moduleAST)
 		code = compile(moduleAST, src, "exec")
 		compileutils.writeCodeToPyc(code, src + 'c')
 
@@ -61,3 +64,10 @@ def optimizeModuleAST(moduleAST):
 			totalOptimizeCount += optimizer.optimized
 
 	return moduleAST, totalOptimizeCount
+
+def checkExprContext(node):
+	if 'ctx' in node._fields:
+		assert node.ctx is not None, ast.dump(node)
+
+	for child in ast.iter_child_nodes(node):
+		checkExprContext(child )
