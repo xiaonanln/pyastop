@@ -135,6 +135,8 @@ class NameScope(object):
 			# Call(expr func, expr * args, keyword * keywords, expr? starargs, expr? kwargs)
 			# keyword = (identifier arg, expr value)
 			return self.isCallArgumentsConst(expr) and self.isConstToConstFunc(expr.func)
+		elif isinstance(expr, ast.Name):
+			return expr.id in  consts.CONST_BUILTIN_NAMES
 
 		# elif isinstance(expr, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
 		# 	# | ListComp(expr elt, comprehension * generators)

@@ -137,6 +137,16 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		elif isinstance(v, set):
 			assert isinstance(ctx, ast.Load)
 			return ast.Set([BaseASTOptimizer._py2ast(x, ctx) for x in v])
+		elif v is None:
+			assert isinstance(ctx, ast.Load)
+			return ast.Name('None', ctx)
+		elif v is True:
+			assert isinstance(ctx, ast.Load)
+			return ast.Name('True', ctx)
+		elif v is False:
+			assert isinstance(ctx, ast.Load)
+			return ast.Name('False', ctx)
+
 		else:
 			assert False, ('_py2ast', v)
 

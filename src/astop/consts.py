@@ -7,3 +7,11 @@ CONST_TO_CONST_BUILTIN_FUNCS = set([
 	'min', 'oct', 'ord', 'pow', 'reversed', 'round', 'slice', 'sorted', 'str', 'sum', 'tuple', 'unichr', 'unicode', 'zip', 'range',
 	'xrange', 'frozenset',
 ])
+
+CONST_BUILTIN_NAMES = ('True', 'False', 'None')
+
+for name in CONST_TO_CONST_BUILTIN_FUNCS:
+	assert name in BUILTIN_NAMES
+
+for name in CONST_BUILTIN_NAMES:
+	assert name, CONST_BUILTIN_NAMES
