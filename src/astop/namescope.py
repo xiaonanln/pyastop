@@ -3,7 +3,8 @@ import astutils
 import consts
 
 class NameScope(object):
-	def __init__(self, parent):
+	def __init__(self, node, parent):
+		self.node = node
 		self.parent = parent
 		self.globals = set()
 		self.locals = set()
@@ -41,7 +42,7 @@ class NameScope(object):
 
 	def visitStmt(self, stmt):
 		if isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
-			self.addLocalName(stmt.name)
+			self.onAssignName(stmt.name)
 		elif isinstance(stmt, (ast.Delete, ast.Assign)):
 			for expr in stmt.targets:
 				self.visitAssignedNamesInExpr(expr)
@@ -63,14 +64,14 @@ class NameScope(object):
 			for exp in expr.elts:
 				self.visitAssignedNamesInExpr(exp)
 		elif isinstance(expr, ast.Name):
-			self.addLocalName(expr)
+			self.onAssignName(expr)
 		else:
 			assert False, ('should not assign', ast.dump(expr))
 
 	def visitAssignedNamesInAlias(self, alias):
 		assert isinstance(alias, ast.alias), repr(alias)
 		if alias.asname:
-			self.addLocalName(alias.asname)
+			self.onAssignName(alias.asname)
 
 	def visitGlobalStmt(self, stmt, asLocal=False):
 		if isinstance(stmt, ast.Global):
@@ -97,7 +98,8 @@ class NameScope(object):
 		for stmt in node.body:
 			self.visitStmt(stmt)
 
-	def addLocalName(self, name):
+	def onAssignName(self, name):
+		"""called when name is assigned"""
 		assert isinstance(name, (ast.Name, str)), repr(name)
 		if isinstance(name, ast.Name):
 			assert isinstance(name.ctx, (ast.Store, ast.Del)), (name.id, name.ctx)
@@ -194,10 +196,11 @@ class NameScope(object):
 
 		return False
 
-builtinsNameScope = NameScope(None)
+builtinsNameScope = NameScope(None, None)
 builtinsNameScope.locals |= set(consts.BUILTIN_NAMES)
 
-def newGlobalNameScope():
-	scope = NameScope(builtinsNameScope)
+def newGlobalNameScope(module):
+	assert isinstance(module, ast.Module)
+	scope = NameScope(module, builtinsNameScope)
 	scope.locals |= set(['__builtins__', '__doc__', '__name__', '__package__'])
 	return scope

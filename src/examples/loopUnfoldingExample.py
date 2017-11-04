@@ -45,6 +45,7 @@ def eval0():
 	return 100
 
 class ExampleClass1(object):
+
 	def __init__(self):
 		pass
 
