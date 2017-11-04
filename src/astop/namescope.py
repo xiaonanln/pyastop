@@ -150,7 +150,7 @@ class NameScope(object):
 		if any(not self.isConstantExpr(arg) for arg in call.args):
 			return False
 
-		if any(not self.isConstantExpr(val) for key, val in call.keywords):
+		if any(not self.isConstantExpr(kw.value) for kw in call.keywords):
 			return False
 
 		if call.starargs and not self.isConstantExpr(call.starargs):

@@ -57,7 +57,11 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 		if isinstance(iter, ast.Call):
 			func = iter.func
 			if isinstance(func, ast.Name) and func.id in LoopUnfoldingASTOptimizer.CONST_FOLDABLE_BUILTIN_FUNCS and self.currentScope.isBuiltinName(func.id) and self.currentScope.isCallArgumentsConst(iter):
-				# for ... in xrange(...):
+				# xrange, frozenset, reversed
+				estIterLen, ok = self.estimateIterLen(iter)
+				if ok and estIterLen > 10: # estimate the length of xrange, so as to avoid unnecessary calculating list(xrange(...))
+					return None, False
+
 				_list = self.evalConstExpr(ast.Call(self.makeName('list'), [iter], [], None, None))
 				return _list.elts, True
 
@@ -69,5 +73,73 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 			return [ast.Str(c) for c in iter.s], True
 
 		return None, False
+
+	def estimateIterLen(self, iter):
+		if isinstance(iter, ast.Call):
+			func = iter.func
+			if func.id == 'xrange':
+				return self.estimateXrangeLen(iter)
+			elif func.id == 'reversed':
+				arg0, ok = astutils.getcallarg0(iter)
+				if ok and arg0 is not None:
+					return self.estimateIterLen(arg0)  # len(reversed(...)) == len(...)
+			elif func.id == 'frozenset':
+				arg0, ok = astutils.getcallarg0(iter)
+				if ok:
+					if arg0 is None:
+						return 0 # frozenset()
+					else:
+						return self.estimateIterLen(arg0) # len(frozenset(...)) <= len(...)
+			else:
+				assert False, ast.dump(iter)
+		elif isinstance(iter, (ast.List, ast.Tuple, ast.Set)):
+			return len(iter.elts), True
+		elif isinstance(iter, ast.Dict):
+			return len(iter.keys), True
+		elif isinstance(iter, ast.Str):
+			return len(iter.s), True
+
+		# estimate iter len failed
+		return None, False
+
+	def estimateXrangeLen(self, iter):
+		assert isinstance(iter, ast.Call), ast.dump(iter)
+		if iter.starargs: # call xrange using starargs? can not solve this yet
+			return None, False
+
+		args = iter.args
+		start, stop, step = 0, None, 1
+		if len(args) == 1:
+			expr = self.evalConstExpr(args[0])
+			assert isinstance(expr, ast.Num)
+			stop = expr.n
+		elif len(args) == 2:
+			expr = self.evalConstExpr(args[0])
+			assert isinstance(expr, ast.Num)
+			start = expr.n
+			expr = self.evalConstExpr(args[1])
+			assert isinstance(expr, ast.Num)
+			stop = expr.n
+		elif len(args) == 3:
+			expr = self.evalConstExpr(args[0])
+			assert isinstance(expr, ast.Num)
+			start = expr.n
+			expr = self.evalConstExpr(args[1])
+			assert isinstance(expr, ast.Num)
+			stop = expr.n
+			expr = self.evalConstExpr(args[2])
+			assert isinstance(expr, ast.Num)
+			step = expr.n
+		else:
+			assert False, 'xrange() requires 1~3 arguments'
+
+		assert step != 0, 'step should be nonzero'
+		if step > 0:
+			stop = max(stop, start) # make stop >= start if step > 0
+		elif step < 0:
+			stop = min(stop, start) # make stop <= start if step < 0
+
+		n = (stop - start + step - 1) // step
+		return n, True
 
 

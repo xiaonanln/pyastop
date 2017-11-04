@@ -57,68 +57,12 @@ def substmts(stmt):
 
 	return
 
-_emptySet = frozenset()
-def nameUsageInStmt(stmt):
-	if isinstance(stmt, ast.FunctionDef):
-		return set([stmt.identifier.id]), namesUsedInExprs(stmt.decorator_list)
-	elif isinstance(stmt, ast.ClassDef):
-		return set([stmt.identifier.id]), namesUsedInExprs(stmt.bases + stmt.decorator_list)
-	elif isinstance(stmt, ast.Return):
-		return _emptySet, namesUsedInExpr(stmt.value) if stmt.value is not None else set()
-	elif isinstance(stmt, ast.Delete):
-		return _emptySet, namesUsedInExprs(stmt.targets)
-	elif isinstance(stmt, ast.Assign):
-		pass
-
-def namesAssigned(expr):
-	pass
-
-def namesUsedInExpr(expr):
-	if isinstance(expr, ast.BoolOp):
-		return namesUsedInExprs(expr.values)
-	elif isinstance(ast.BinOp):
-		return namesUsedInExprs([expr.left, expr.right])
-	elif isinstance(ast.UnaryOp):
-		pass
-
-def namesUsedInExprs(exprs):
-	names = set()
-	for expr in exprs:
-		names |= namesUsedInExpr(expr)
-	return names
-
-	# stmt = FunctionDef(identifier name, arguments args,
-     #                        stmt* body, expr* decorator_list)
-	#       | ClassDef(identifier name, expr* bases, stmt* body, expr* decorator_list)
-	#       | Return(expr? value)
-    #
-	#       | Delete(expr* targets)
-	#       | Assign(expr* targets, expr value)
-	#       | AugAssign(expr target, operator op, expr value)
-    #
-	#       -- not sure if bool is allowed, can always use int
- 	#       | Print(expr? dest, expr* values, bool nl)
-    #
-	#       -- use 'orelse' because else is a keyword in target languages
-	#       | For(expr target, expr iter, stmt* body, stmt* orelse)
-	#       | While(expr test, stmt* body, stmt* orelse)
-	#       | If(expr test, stmt* body, stmt* orelse)
-	#       | With(expr context_expr, expr? optional_vars, stmt* body)
-    #
-	#       -- 'type' is a bad name
-	#       | Raise(expr? type, expr? inst, expr? tback)
-	#       | TryExcept(stmt* body, excepthandler* handlers, stmt* orelse)
-	#       | TryFinally(stmt* body, stmt* finalbody)
-	#       | Assert(expr test, expr? msg)
-    #
-	#       | Import(alias* names)
-	#       | ImportFrom(identifier? module, alias* names, int? level)
-    #
-	#       -- Doesn't capture requirement that locals must be
-	#       -- defined if globals is
-	#       -- still supports use as a function!
-	#       | Exec(expr body, expr? globals, expr? locals)
-    #
-	#       | Global(identifier* names)
-	#       | Expr(expr value)
-	#       | Pass | Break | Continue
+def getcallarg0(call):
+	assert isinstance(call, ast.Call)
+	if call.args:
+		return call.args[0], True
+	elif call.starargs: # can not parse starargs yet
+		return None, False
+	elif not call.keywords and not call.kwargs:
+		# call has no argument
+		return None, True

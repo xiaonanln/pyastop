@@ -7,7 +7,19 @@ def gen():
 		yield i
 
 def test1():
-	for a in reversed([1,2,3]):
+	for a in reversed([1,2,3]): # should expand
+		print a
+
+	for a in xrange(3): # should expand
+		print a
+
+	for a in reversed(xrange(3)): # should expand
+		print a
+
+	for a in xrange(1000000): # should not expand, and should not slow down pyastop
+		print a
+
+	for a in reversed(xrange(1000000)): # should not expand, and should not slow down pyastop
 		print a
 
 	# for i in gen():

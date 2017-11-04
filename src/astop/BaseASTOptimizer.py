@@ -1,7 +1,7 @@
 import ast
 import sys
 import astutils
-
+import codegen
 import namescope
 
 
@@ -59,8 +59,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 	@staticmethod
 	def node2str(node):
 		if hasattr(node, '_fields'):
-			name = node.__class__.__name__
-			return name + '<' + ', '.join('%s=%s' % (f, BaseASTOptimizer.node2str(getattr(node, f))) for f in node._fields) + '>'
+			return ast.dump(node)
 		elif isinstance(node, list):
 			return [BaseASTOptimizer.node2str(n) for n in node]
 		else:
@@ -179,3 +178,6 @@ class BaseASTOptimizer(ast.NodeTransformer):
 				return True
 
 		return False
+
+	def node2src(self, node):
+		return codegen.to_source(node)

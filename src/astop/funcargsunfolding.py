@@ -17,3 +17,5 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 	def tryOptimizeCall(self, call):
 		assert isinstance(call, ast.Call)
 		pass
+
+
