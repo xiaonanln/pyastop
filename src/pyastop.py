@@ -6,7 +6,7 @@ import astop
 import os
 import ast
 
-c = ast.parse("[a.a,b.b,c.c] = 1,2,3", "noname")
+c = ast.parse("a, b = b, a", "noname")
 print dir(c)
 print ast.dump(c)
 

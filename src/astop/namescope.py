@@ -2,12 +2,104 @@ import ast
 import astutils
 import consts
 
+class PotentialValues(object):
+	def __init__(self, *values):
+		if values:
+			self.values = set(values)
+			self.canBeAnyValue = False
+		else:
+			self.values = None
+			self.canBeAnyValue = True
+
+	def setCanBeAnyValue(self):
+		self.canBeAnyValue = True
+		self.values = None # values not useful anymore
+
+	def merge(self, otherValues):
+		if isinstance(self, AnyValue):
+			return self # AnyValue merge other => AnyValue
+		elif isinstance(otherValues, AnyValue):
+			return otherValues # ... merge AnyValue => AnyValue
+		elif isinstance(self, MultipleTypeValues):
+			self.addValues(otherValues)
+			return self
+		elif isinstance(otherValues, MultipleTypeValues):
+			otherValues.addValues(self)
+			return otherValues
+		elif self.__class__ is otherValues.__class__:
+			# values of same class, merge them
+			if self.canBeAnyValue or otherValues.canBeAnyValue:
+				return self.__class__() # any value + ... = any value
+			else:
+				return self.__class__(*(self.values | otherValues.values))
+		else:
+			return MultipleTypeValues( self, otherValues )
+
+	def __repr__(self):
+		if self.canBeAnyValue: return self.__class__.__name__ + "<any>"
+		else: return self.__class__.__name__ + "<" + "|".join(map(str, self.values)) + ">"
+	__str__ = __repr__
+
+class MultipleTypeValues(PotentialValues):
+	def __init__(self, *values):
+		assert values, 'values should not be empty'
+		for value in values:
+			assert isinstance(value, PotentialValues) and not isinstance(value, MultipleTypeValues) # do not be recursive
+		self.values = values
+
+	def addValues(self, values):
+		assert isinstance(values, PotentialValues)
+		if isinstance(values, MultipleTypeValues):
+			for _values in values.values:
+				self.addValues(_values)
+		else:
+			for existingValues in self.values:
+				foundSameClass = False
+				if existingValues.__class__ is values.__clas__: # merge same type
+					self.values.remove(existingValues)
+					self.values.add( existingValues.merge(values) )
+					foundSameClass = True
+					break
+
+				if not foundSameClass:
+					self.values.add( values )
+
+class AnyValue(PotentialValues): pass
+anyValue = AnyValue()
+
+class UnresolvedName(PotentialValues): pass
+unresolvedName = UnresolvedName
+
+class NumValues(PotentialValues): pass
+class StrValues(PotentialValues): pass
+class TupleValues(PotentialValues): pass
+class ListValues(PotentialValues): pass
+class SetValues(PotentialValues): pass
+class DictValues(PotentialValues): pass
+class ModuleValues(PotentialValues):
+	def __init__(self):
+		super(ModuleValues, self).__init__()
+
+anyModule = ModuleValues()
+
+class BuiltinValues(PotentialValues): pass
+
+class FunctionValues(PotentialValues):
+	def __init__(self, node):
+		assert isinstance(node, ast.FunctionDef)
+		super(FunctionValues, self).__init__(node)
+
+class ClassValues(PotentialValues):
+	def __init__(self, node):
+		assert isinstance(node, ast.ClassDef)
+		super(ClassValues, self).__init__(node)
+
 class NameScope(object):
 	def __init__(self, node, parent):
 		self.node = node
 		self.parent = parent
 		self.globals = set()
-		self.locals = set()
+		self.locals = {}
 
 	def isNameResolved(self, name):
 		if name in self.globals:
@@ -41,37 +133,76 @@ class NameScope(object):
 			self.visitStmt(stmt)
 
 	def visitStmt(self, stmt):
-		if isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
-			self.onAssignName(stmt.name)
-		elif isinstance(stmt, (ast.Delete, ast.Assign)):
+		if isinstance(stmt, ast.FunctionDef):
+			self.onAssignName(stmt.name, FunctionValues(stmt)) # value can be a FucntionDef
+		elif isinstance(stmt, ast.ClassDef):
+			self.onAssignName(stmt.name, ClassValues(stmt))  # value can be a ClassDef
+		elif isinstance(stmt, ast.Assign):
+			if len(stmt.targets) == 1:
+				self.visitAssignedNameInExpr(stmt.targets[0], stmt.value)
+			else:
+				assert False, "I don't know what kind of code compiles to this AST node"
+				self.visitAssignedNameInExpr(ast.Tuple(stmt.targets, ast.Store()), stmt.value) # convert to tuple assign ... is it correct ?
+		elif isinstance(stmt, ast.Delete):
 			for expr in stmt.targets:
-				self.visitAssignedNamesInExpr(expr)
+				self.visitAssignedNameInExpr(expr, unresolvedName)
 		elif isinstance(stmt, ast.AugAssign):
-			self.visitAssignedNamesInExpr(stmt.target)
+			self.visitAssignedNameInExpr(stmt.target, ast.BinOp(stmt.target, stmt.op, stmt.value)) # target op= value ==> target = target op value
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
 			for alias in stmt.names:
-				self.visitAssignedNamesInAlias(alias)
+				self.visitAssignedNamesInAlias(alias, anyModule)
 
 		if self.isGlobalScope() and isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
 			# if this is the module scope, and we are visiting functions or classes, put the function or class's global names to the current local names
 			for stmt in stmt.body:
 				self.visitGlobalStmt(stmt, asLocal=True)
 
-	def visitAssignedNamesInExpr(self, expr):
+	def visitAssignedNameInExpr(self, expr, value):
 		if isinstance(expr, (ast.Attribute, ast.Subscript)):
 			pass
 		elif isinstance(expr, (ast.List, ast.Tuple)):
-			for exp in expr.elts:
-				self.visitAssignedNamesInExpr(exp)
+			if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+				for i, exp in enumerate(expr.elts):
+					self.visitAssignedNameInExpr(exp, value.elts[i])
+			else:
+				for exp in expr.elts:
+					self.visitAssignedNameInExpr(exp, anyValue)
 		elif isinstance(expr, ast.Name):
-			self.onAssignName(expr)
+			if not isinstance(value, PotentialValues):
+				pv = self.getPotentialValueOfExpr(value)
+				print 'potential value of %s ==> %s' % (ast.dump(value), pv)
+			else:
+				pv = value # if value is PotentialValues, just keep it
+			self.onAssignName(expr, pv)
 		else:
 			assert False, ('should not assign', ast.dump(expr))
 
-	def visitAssignedNamesInAlias(self, alias):
+	def visitAssignedNamesInAlias(self, alias, value):
 		assert isinstance(alias, ast.alias), repr(alias)
 		if alias.asname:
-			self.onAssignName(alias.asname)
+			self.onAssignName(alias.asname, value)
+
+	def getPotentialValueOfExpr(self, expr):
+		if isinstance(expr, ast.Num):
+			return NumValues(expr.n)
+		elif isinstance(expr, ast.Str):
+			return StrValues(expr.s)
+		elif isinstance(expr, (ast.List, ast.ListComp)):
+			return ListValues()
+		elif isinstance(expr, (ast.Set, ast.SetComp)):
+			return SetValues()
+		elif isinstance(expr, (ast.Dict, ast.DictComp)):
+			return DictValues()
+		elif isinstance(expr, ast.Tuple):
+			return TupleValues()
+		elif isinstance(expr, ast.Name):
+			# assigning name will transfer values of this name, but since names can be assigned
+			return anyValue # todo: implement the transfer of values of name
+		else:
+			return anyValue # others are not supported yet
+
+
+		return anyValue
 
 	def visitGlobalStmt(self, stmt, asLocal=False):
 		if isinstance(stmt, ast.Global):
@@ -83,6 +214,18 @@ class NameScope(object):
 
 	def visitFunctionBody(self, node):
 		assert node, ast.FunctionDef
+
+		print 'visitFunctionBody', node.name,  ast.dump(node.args)
+		# arguments = (expr * args, identifier? vararg, identifier? kwarg, expr * defaults)
+
+		for i, arg in enumerate(node.args.args):
+			self.visitAssignedNameInExpr(arg, anyValue)
+
+		if node.args.vararg: # f(*args)
+			self.onAssignName(node.args.vararg, TupleValues()) # args can be any tuple
+
+		if node.args.kwarg:
+			self.onAssignName(node.args.kwarg, DictValues()) # kwarg can be any dict
 
 		# find all global names first
 		for stmt in node.body:
@@ -98,17 +241,27 @@ class NameScope(object):
 		for stmt in node.body:
 			self.visitStmt(stmt)
 
-	def onAssignName(self, name):
+	def onAssignName(self, name, value):
 		"""called when name is assigned"""
 		assert isinstance(name, (ast.Name, str)), repr(name)
 		if isinstance(name, ast.Name):
-			assert isinstance(name.ctx, (ast.Store, ast.Del)), (name.id, name.ctx)
+			assert isinstance(name.ctx, (ast.Store, ast.Del, ast.Param)), (name.id, name.ctx)
 			name = name.id
 
 		if name in self.globals:
+			# assign to global ...
+			globalScope = self.getGlobalScope()
+			assert globalScope, 'can not get global scope'
+			globalScope.onAssignName(name, value)
 			return
 
-		self.locals.add(name)
+		assert isinstance(value, PotentialValues)
+		if name not in self.locals:
+			self.locals[name] = value
+		else:
+			oldValues = self.locals[name]
+			self.locals[name] = oldValues.merge(value)
+			print 'merge %s, %s => %s' % (oldValues, value, self.locals[name])
 
 	def isConstantExpr(self, expr):
 		if isinstance(expr, ast.Num):
@@ -199,10 +352,17 @@ class NameScope(object):
 		return False
 
 builtinsNameScope = NameScope(None, None)
-builtinsNameScope.locals |= set(consts.BUILTIN_NAMES)
+for k in consts.BUILTIN_NAMES:
+	if k.startswith('_'):
+		builtinsNameScope.onAssignName(k, anyValue)
+	else:
+		builtinsNameScope.onAssignName(k, BuiltinValues(__builtins__[k]))
+for k, v in builtinsNameScope.locals.iteritems():
+	print "BUILTIN %s = %s" % (k, v)
 
 def newGlobalNameScope(module):
 	assert isinstance(module, ast.Module)
 	scope = NameScope(module, builtinsNameScope)
-	scope.locals |= set(['__builtins__', '__doc__', '__name__', '__package__'])
+	for k in ['__builtins__', '__doc__', '__name__', '__package__']:
+		scope.onAssignName(k, anyValue)
 	return scope
