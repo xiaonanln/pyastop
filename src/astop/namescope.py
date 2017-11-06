@@ -35,10 +35,11 @@ class PotentialValues(object):
 		else:
 			return MultipleTypeValues( self, otherValues )
 
-	def __repr__(self):
-		if self.canBeAnyValue: return self.__class__.__name__ + "<any>"
-		else: return self.__class__.__name__ + "<" + "|".join(map(str, self.values)) + ">"
-	__str__ = __repr__
+	def __str__(self):
+		return "%s<%s>" % (
+			self.__class__.__name__,
+			"any" if self.canBeAnyValue else "|".join(map(str, self.values))
+		)
 
 class MultipleTypeValues(PotentialValues):
 	def __init__(self, *values):
@@ -99,6 +100,13 @@ class ClassInstanceValues(PotentialValues):
 		assert isinstance(classnode, ast.ClassDef)
 		self.classnode = classnode
 		super(ClassInstanceValues, self).__init__(*values)
+
+	def __str__(self):
+		return "%s<%s:%s>" % (
+			self.__class__.__name__,
+			self.classnode.name,
+			"any" if self.canBeAnyValue else "|".join(map(str, self.values))
+		)
 
 class NameScope(object):
 	def __init__(self, node, parent):
@@ -176,7 +184,7 @@ class NameScope(object):
 		elif isinstance(expr, ast.Name):
 			if not isinstance(value, PotentialValues):
 				pv = self.getPotentialValueOfExpr(value)
-				print 'potential value of %s ==> %s' % (ast.dump(value), pv)
+				# print 'potential value of %s ==> %s' % (ast.dump(value), pv)
 			else:
 				pv = value # if value is PotentialValues, just keep it
 			self.onAssignName(expr, pv)
