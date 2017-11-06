@@ -94,6 +94,12 @@ class ClassValues(PotentialValues):
 		assert isinstance(node, ast.ClassDef)
 		super(ClassValues, self).__init__(node)
 
+class ClassInstanceValues(PotentialValues):
+	def __init__(self, classnode, *values):
+		assert isinstance(classnode, ast.ClassDef)
+		self.classnode = classnode
+		super(ClassInstanceValues, self).__init__(*values)
+
 class NameScope(object):
 	def __init__(self, node, parent):
 		self.node = node
@@ -215,11 +221,19 @@ class NameScope(object):
 	def visitFunctionBody(self, node):
 		assert node, ast.FunctionDef
 
-		print 'visitFunctionBody', node.name,  ast.dump(node.args)
+		# print 'visitFunctionBody', node.name,  ast.dump(node.args)
 		# arguments = (expr * args, identifier? vararg, identifier? kwarg, expr * defaults)
-
 		for i, arg in enumerate(node.args.args):
-			self.visitAssignedNameInExpr(arg, anyValue)
+			argValues = anyValue
+			if i == 0 and isinstance(self.parent.node, ast.ClassDef):
+				functype = self.parent.getFunctionType(node)
+				if functype == 'instancemethod':
+					# first argument of a instancemethod is self
+					argValues = ClassInstanceValues(self.parent.node) # self can be any instance of this class
+				elif functype == 'classmethod':
+					# first argument of a classmethod is the class
+					argValues = ClassValues(self.parent.node)
+			self.visitAssignedNameInExpr(arg, argValues)
 
 		if node.args.vararg: # f(*args)
 			self.onAssignName(node.args.vararg, TupleValues()) # args can be any tuple
@@ -234,6 +248,22 @@ class NameScope(object):
 		# let all stmts add names to the local scope
 		for stmt in node.body:
 			self.visitStmt(stmt)
+
+	def getFunctionType(self, node):
+		"""Get the type of a function, which can be function | instancemethod | classmethod | staticmethod"""
+		assert isinstance(node, ast.FunctionDef)
+		if self.isGlobalScope():
+			return 'function'
+
+		for deco in node.decorator_list:
+			if isinstance(deco, ast.Name):
+				if deco.id == 'staticmethod' and self.isBuiltinName(deco):
+					return 'staticmethod'
+				elif deco.id == 'classmethod' and self.isBuiltinName(deco):
+					return 'classmethod'
+
+		return 'instancemethod'
+
 
 	def visitClassBody(self, node):
 		assert node, ast.ClassDef
@@ -261,7 +291,10 @@ class NameScope(object):
 		else:
 			oldValues = self.locals[name]
 			self.locals[name] = oldValues.merge(value)
-			print 'merge %s, %s => %s' % (oldValues, value, self.locals[name])
+			# print 'merge %s, %s => %s' % (oldValues, value, self.locals[name])
+
+		if not (name.startswith('__') and name.endswith('__')):
+			print 'name %s can be %s' % (name, self.locals[name])
 
 	def isConstantExpr(self, expr):
 		if isinstance(expr, ast.Num):
