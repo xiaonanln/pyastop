@@ -13,6 +13,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 	def __init__(self):
 		super(BaseASTOptimizer, self).__init__()
 		self._optimized = 0
+		self.source = ""
 		if self.requireNameScopes():
 			self.currentScope = namescope.builtinsNameScope
 			self.nameScopes = {}
@@ -22,9 +23,11 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 	def visit(self, node):
 		"""Visit a node."""
-		if isinstance(node, ast.Module) and self.requireNameScopes():
-			# visiting this module
-			self.nameScopes = namescope.genNameScopes(node)
+		if isinstance(node, ast.Module):
+			self.source = node.source
+			if self.requireNameScopes():
+				# visiting this module
+				self.nameScopes = namescope.genNameScopes(node)
 
 		if isinstance(node, ast.AST) and hasattr(node, 'lineno'):
 			self._currentNode = node
@@ -32,12 +35,18 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		self.beforeOptimizeNode(node)
 
 		self.optimizeChildren(node) # optimize children before optimizing parent node
-		node, optimized = self.optimize(node)
-		assert node is not None
-		if optimized: self._optimized += 1
+		optnode, optimized = self.optimize(node)
+		assert optnode is not None
+		if optimized:
+			print >>sys.stderr, """File "%s", line %d, %s ==> %s""" % (self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
+			self._optimized += 1
+			node = optnode
 
 		self.afterOptimizeNode(node)
 		return node
+
+	def currentLineno(self):
+		return self._currentNode.lineno if self._currentNode else 0
 
 	def beforeOptimizeNode(self, node):
 		if self.requireNameScopes():
@@ -209,4 +218,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		return False
 
 	def node2src(self, node):
+		if isinstance(node, list):
+			return "[" + ", ".join(map(self.node2src, node)) + "]"
+
 		return codegen.to_source(node)

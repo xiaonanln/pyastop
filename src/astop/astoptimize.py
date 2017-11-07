@@ -15,6 +15,8 @@ from deadcodeeliminating import DeadCodeEliminatingASTOptimizer
 def astoptimize(sources):
 	print >>sys.stderr, 'ast optimizeing %d sources ...' % len(sources)
 	moduleASTs = [compileutils.compileModuleAST(src) for src in sources]
+	for src, module in zip(sources, moduleASTs):
+		module.source = src
 
 	print >>sys.stderr, 'All sources compiled, start analyzing ...'
 	for moduleAST in moduleASTs:

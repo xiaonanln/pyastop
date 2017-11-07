@@ -1,5 +1,6 @@
 
 import ast
+import astutils
 from BaseASTOptimizer import BaseASTOptimizer
 import namescope
 
@@ -36,7 +37,7 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 		# 	return call, False # if function def has *arg or **kwargs, do not optimize
 		#
 
-		print 'FuncArgsUnfoldingASTOptimizer.tryOptimizeCall: func of %s is %s, bounded %s' % (ast.dump(call.func), func, bounded)
+		# print 'FuncArgsUnfoldingASTOptimizer.tryOptimizeCall: func of %s is %s, bounded %s' % (ast.dump(call.func), func, bounded)
 		argstart = 1 if bounded else 0
 		argname2index = {}
 		for i, arg in enumerate(func.args.args):
@@ -81,12 +82,18 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 
 		for i, arg in enumerate(callargs):
 			if arg is None:
-				return call, False
+				defaultindex = argstart + i - (len(func.args.args) - len(func.args.defaults))
+				assert defaultindex >= 0, 'default index is %d while optimizing %s' % (defaultindex, self.node2src(call))
+				defaultval = func.args.defaults[defaultindex]
+				if not self.isImmutableDefaultArg(defaultval):
+					return call, False
+
+				callargs[i] = astutils.copy_node(defaultval)
 
 		newcall = ast.Call(call.func, callargs, [], None, None)
 		newcall = self.copyLocation(newcall, call)
-		print 'Old call: %s' % self.node2src(call)
-		print 'New call: %s' % self.node2src(newcall)
+		# print 'Old call: %s' % self.node2src(call)
+		# print 'New call: %s' % self.node2src(newcall)
 		return newcall, True
 		# return call, False
 
@@ -99,3 +106,5 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 
 		return None, False
 
+	def isImmutableDefaultArg(self, expr):
+		return isinstance(expr, (ast.Num, ast.Str, ast.Tuple))

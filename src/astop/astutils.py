@@ -66,3 +66,10 @@ def getcallarg0(call):
 	elif not call.keywords and not call.kwargs:
 		# call has no argument
 		return None, True
+
+def copy_node(node):
+	fields = tuple(getattr(node, k) for k in node._fields)
+	newnode = node.__class__(*fields)
+	ast.copy_location(newnode, node)
+	return newnode
+

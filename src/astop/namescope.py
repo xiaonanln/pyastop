@@ -268,7 +268,7 @@ class NameScope(object):
 		for stmt in node.body:
 			self.visitGlobalStmt(stmt)
 
-		print 'globals of %s is %s' % (node.name, self.globals)
+		# print 'globals of %s is %s' % (node.name, self.globals)
 
 		# let all stmts add names to the local scope
 		for stmt in node.body:
@@ -317,8 +317,8 @@ class NameScope(object):
 			self.locals[name] = oldValues.merge(value)
 			# print 'merge %s, %s => %s' % (oldValues, value, self.locals[name])
 
-		if not (name.startswith('__') and name.endswith('__')):
-			print 'name %s can be %s' % (name, self.locals[name])
+		# if not (name.startswith('__') and name.endswith('__')):
+			# print 'name %s can be %s' % (name, self.locals[name])
 
 	def isConstantExpr(self, expr):
 		if isinstance(expr, ast.Num):
@@ -414,7 +414,7 @@ class NameScope(object):
 		elif isinstance(expr, ast.Attribute):
 			valuePvs = self.getPotentialValuesOfExpr(expr.value)
 			# now calculate value.attr
-			print 'getPotentialValuesOfExpr', ast.dump(expr.value), valuePvs, expr.attr
+			# print 'getPotentialValuesOfExpr', ast.dump(expr.value), valuePvs, expr.attr
 			if isinstance(valuePvs, ClassInstanceValues):
 				# value is an instance of a class, so value.attr can be a function
 				classdef = valuePvs.classnode

@@ -8,12 +8,13 @@ def foo(x, y):
 	print len
 	global a
 	a = 1
+	xxx
 
 foo(1,2)
 print locals()
 print a
-
-#
+xxx
+#xxx
 #
 #
 # def f(a, b, c, d):
