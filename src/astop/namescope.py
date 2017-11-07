@@ -37,7 +37,11 @@ class PotentialValues(object):
 			if self.canBeAnyValue or otherValues.canBeAnyValue:
 				return self.__class__() # any value + ... = any value
 			else:
-				return self.__class__(*(self.values | otherValues.values))
+				try:
+					return self.__class__(*(self.values | otherValues.values))
+				except:
+					print 'merging %s and %s' % (self, otherValues)
+					raise
 		else:
 			return MultipleTypeValues( self, otherValues )
 
@@ -91,11 +95,7 @@ anyModule = ModuleValues()
 
 class BuiltinValues(PotentialValues): pass
 
-class FunctionValues(PotentialValues):
-	def __init__(self, node):
-		assert isinstance(node, ast.FunctionDef)
-		super(FunctionValues, self).__init__(node)
-
+class FunctionValues(PotentialValues): pass
 class UnboundedMethodValues(FunctionValues): pass
 class BoundedMethodValues(FunctionValues): pass
 
@@ -175,11 +175,8 @@ class NameScope(object):
 			classScope.visitClassBody(stmt, res )
 
 		elif isinstance(stmt, ast.Assign):
-			if len(stmt.targets) == 1:
-				self.visitAssignedNameInExpr(stmt.targets[0], stmt.value)
-			else:
-				assert False, "I don't know what kind of code compiles to this AST node"
-				self.visitAssignedNameInExpr(ast.Tuple(stmt.targets, ast.Store()), stmt.value) # convert to tuple assign ... is it correct ?
+			for target in stmt.targets:
+				self.visitAssignedNameInExpr(target, stmt.value)
 		elif isinstance(stmt, ast.Delete):
 			for expr in stmt.targets:
 				self.visitAssignedNameInExpr(expr, unresolvedName)
@@ -188,6 +185,9 @@ class NameScope(object):
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
 			for alias in stmt.names:
 				self.visitAssignedNamesInAlias(alias, anyModule)
+		else:
+			for substmt in astutils.substmts(stmt):
+				self.visitStmt(substmt, res)
 
 	def visitAssignedNameInExpr(self, expr, value):
 		if isinstance(expr, (ast.Attribute, ast.Subscript)):
@@ -282,9 +282,9 @@ class NameScope(object):
 
 		for deco in node.decorator_list:
 			if isinstance(deco, ast.Name):
-				if deco.id == 'staticmethod' and self.isBuiltinName(deco):
+				if deco.id == 'staticmethod' and self.isBuiltinName(deco.id):
 					return 'staticmethod'
-				elif deco.id == 'classmethod' and self.isBuiltinName(deco):
+				elif deco.id == 'classmethod' and self.isBuiltinName(deco.id):
 					return 'classmethod'
 
 		return 'instancemethod'
@@ -458,9 +458,10 @@ class NameScope(object):
 		while self:
 			if name in self.locals:
 				return self.locals[name]
+			self = self.parent
 
-		# name not found ? that should not be happening
-		assert False, 'name %s not defined' % name
+		# can not resolve
+		return anyValue
 
 builtinsNameScope = NameScope(None, None)
 for k in consts.BUILTIN_NAMES:

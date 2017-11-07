@@ -26,7 +26,7 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 			# no argument need to expand
 			return call, False
 
-		assert not (call.starargs and call.kwargs), 'should not have both *args and **kwargs: %s' % self.node2src(call)
+		# assert not (call.starargs and call.kwargs), 'should not have both *args and **kwargs: %s' % self.node2src(call)
 
 		func, bounded = self.tryDetermineFunction(call.func)
 		if not func:
@@ -34,9 +34,8 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 
 		assert isinstance(func, ast.FunctionDef)
 		# 	arguments = (expr* args, identifier? vararg, identifier? kwarg, expr* defaults)
-		# if func.args.vararg or func.args.kwarg:
-		# 	return call, False # if function def has *arg or **kwargs, do not optimize
-		#
+		if func.args.vararg or func.args.kwarg:
+			return call, False # if function def has *arg or **kwargs, do not optimize
 
 		# print 'FuncArgsUnfoldingASTOptimizer.tryOptimizeCall: func of %s is %s, bounded %s' % (ast.dump(call.func), func, bounded)
 		argstart = 1 if bounded else 0

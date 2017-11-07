@@ -60,6 +60,7 @@ def optimizeModuleAST(moduleAST):
 			InliningASTOptimizer):
 
 		optimizer = optimizerClass()
+		print >>sys.stderr, 'Running %s on %s ...' % (optimizerClass.__name__, moduleAST.source)
 		optModuleAST = optimizer.visit(moduleAST)
 		if optimizer.optimized:
 			moduleAST = optModuleAST

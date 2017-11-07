@@ -17,8 +17,13 @@ class ConstFoldingASTOptimizer(BaseASTOptimizer):
 			return node, False
 
 		if self.isConstFoldableExpr(node) and self.currentScope.isConstantExpr(node):
-			if isinstance(node, ast.Call) and node.func.id in ConstFoldingASTOptimizer.UNFOLDABLE_BUILTIN_FUNCS:
-				return node, False # these functions can not be unfolded, because we can not represent them using consts
+			if isinstance(node, ast.Call):
+				if node.func.id in ConstFoldingASTOptimizer.UNFOLDABLE_BUILTIN_FUNCS:
+					return node, False # these functions can not be unfolded, because we can not represent them using consts
+				elif node.func.id == 'range':
+					rangelen, ok = self.estimateXrangeLen(node)
+					if not ok or rangelen >= 100:
+						return node, False
 
 			node = self.evalConstExpr(node)
 			return node, True

@@ -35,7 +35,9 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		self.beforeOptimizeNode(node)
 
 		self.optimizeChildren(node) # optimize children before optimizing parent node
+		# print 'optimizing ', self.node2src(node),
 		optnode, optimized = self.optimize(node)
+		print ''
 		assert optnode is not None
 		if optimized:
 			print >>sys.stderr, """File "%s", line %d, %s ==> %s""" % (self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
@@ -156,6 +158,13 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			return ast.Str(v)
 		elif isinstance(v, list):
 			return ast.List([BaseASTOptimizer._py2ast(x, ctx) for x in v], ctx)
+		elif isinstance(v, dict):
+			items = v.items()
+			keys = [BaseASTOptimizer._py2ast(k, ctx) for k, v in items]
+			vals = [BaseASTOptimizer._py2ast(v, ctx) for k, v in items]
+			return ast.Dict( keys, vals )
+		elif isinstance(v, tuple):
+			return ast.Tuple([BaseASTOptimizer._py2ast(x, ctx) for x in v], ctx)
 		elif isinstance(v, set):
 			assert isinstance(ctx, ast.Load)
 			return ast.Set([BaseASTOptimizer._py2ast(x, ctx) for x in v])
@@ -168,7 +177,6 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		elif v is False:
 			assert isinstance(ctx, ast.Load)
 			return ast.Name('False', ctx)
-
 		else:
 			assert False, ('_py2ast', v)
 
@@ -222,3 +230,44 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			return "[" + ", ".join(map(self.node2src, node)) + "]"
 
 		return codegen.to_source(node)
+
+	def estimateXrangeLen(self, iter):
+		assert isinstance(iter, ast.Call), ast.dump(iter)
+		if iter.starargs: # call xrange using starargs? can not solve this yet
+			return None, False
+
+		args = iter.args
+		start, stop, step = 0, None, 1
+		if len(args) == 1:
+			expr = self.evalConstExpr(args[0])
+			assert isinstance(expr, ast.Num)
+			stop = expr.n
+		elif len(args) == 2:
+			expr = self.evalConstExpr(args[0])
+			assert isinstance(expr, ast.Num)
+			start = expr.n
+			expr = self.evalConstExpr(args[1])
+			assert isinstance(expr, ast.Num)
+			stop = expr.n
+		elif len(args) == 3:
+			expr = self.evalConstExpr(args[0])
+			assert isinstance(expr, ast.Num)
+			start = expr.n
+			expr = self.evalConstExpr(args[1])
+			assert isinstance(expr, ast.Num)
+			stop = expr.n
+			expr = self.evalConstExpr(args[2])
+			assert isinstance(expr, ast.Num)
+			step = expr.n
+		else:
+			assert False, 'xrange() requires 1~3 arguments'
+
+		assert step != 0, 'step should be nonzero'
+		if step > 0:
+			stop = max(stop, start) # make stop >= start if step > 0
+		elif step < 0:
+			stop = min(stop, start) # make stop <= start if step < 0
+
+		n = (stop - start + step - 1) // step
+		return n, True
+
