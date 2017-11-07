@@ -1,5 +1,6 @@
 
 import ast
+import consts
 import astutils
 from BaseASTOptimizer import BaseASTOptimizer
 import namescope
@@ -107,4 +108,9 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 		return None, False
 
 	def isImmutableDefaultArg(self, expr):
-		return isinstance(expr, (ast.Num, ast.Str, ast.Tuple))
+		if isinstance(expr, (ast.Num, ast.Str, ast.Tuple)):
+			return True
+		elif isinstance(expr, ast.Name):
+			return expr.id in consts.CONST_BUILTIN_NAMES
+		else:
+			return False
