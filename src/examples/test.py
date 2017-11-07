@@ -1,5 +1,12 @@
 import time
 
+a = 1
+
+def foo(x, y):
+	global a
+	a = 1
+
+print a
 
 #
 #

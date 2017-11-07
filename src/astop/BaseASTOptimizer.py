@@ -13,11 +13,19 @@ class BaseASTOptimizer(ast.NodeTransformer):
 	def __init__(self):
 		super(BaseASTOptimizer, self).__init__()
 		self._optimized = 0
-		if self.RequireNameScope or self.RequireTypeInference:
+		if self.requireNameScopes():
 			self.currentScope = namescope.builtinsNameScope
+			self.nameScopes = {}
+
+	def requireNameScopes(self):
+		return self.RequireNameScope or self.RequireTypeInference
 
 	def visit(self, node):
 		"""Visit a node."""
+		if isinstance(node, ast.Module) and self.requireNameScopes():
+			# visiting this module
+			self.nameScopes = namescope.genNameScopes(node)
+
 		if isinstance(node, ast.AST) and hasattr(node, 'lineno'):
 			self.currentPos = node
 
@@ -32,19 +40,21 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		return node
 
 	def beforeOptimizeNode(self, node):
-		if self.RequireNameScope or self.RequireTypeInference:
-			if isinstance(node, ast.Module):
-				self.currentScope = namescope.newGlobalNameScope(node)
-				self.currentScope.visitModuleBody(node)
-			elif isinstance(node, ast.ClassDef):
-				self.currentScope = namescope.NameScope(node, self.currentScope)
-				self.currentScope.visitClassBody(node)
-			elif isinstance(node, ast.FunctionDef):
-				self.currentScope = namescope.NameScope(node, self.currentScope)
-				self.currentScope.visitFunctionBody(node)
+		if self.requireNameScopes():
+			if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef)):
+				self.currentScope = self.nameScopes[node] # node should exists in name scopes
+
+			# 	self.currentScope = namescope.newGlobalNameScope(node)
+			# 	self.currentScope.visitModuleBody(node)
+			# elif isinstance(node, ast.ClassDef):
+			# 	self.currentScope = namescope.NameScope(node, self.currentScope)
+			# 	self.currentScope.visitClassBody(node)
+			# elif isinstance(node, ast.FunctionDef):
+			# 	self.currentScope = namescope.NameScope(node, self.currentScope)
+			# 	self.currentScope.visitFunctionBody(node)
 
 	def afterOptimizeNode(self, node):
-		if self.RequireNameScope or self.RequireTypeInference:
+		if self.requireNameScopes():
 			if isinstance(node, ast.Module):
 				self.currentScope = self.currentScope.parent
 			elif isinstance(node, ast.ClassDef):

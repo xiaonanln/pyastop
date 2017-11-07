@@ -1,5 +1,5 @@
-
-BUILTIN_NAMES = list(__builtins__.keys())
+import __builtin__
+BUILTIN_NAMES = dir(__builtin__)
 
 CONST_TO_CONST_BUILTIN_FUNCS = set([
 	'abs', 'all', 'any', 'bin', 'bool', 'callable', 'chr', 'cmp', 'filter', 'dict', 'divmod', 'enumerate', 'eval', 'float',

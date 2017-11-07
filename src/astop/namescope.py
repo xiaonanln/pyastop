@@ -1,6 +1,7 @@
 import ast
 import astutils
 import consts
+import __builtin__
 
 class PotentialValues(object):
 	def __init__(self, *values):
@@ -110,6 +111,9 @@ class ClassInstanceValues(PotentialValues):
 
 class NameScope(object):
 	def __init__(self, node, parent):
+		if node is not None:
+			assert isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef))
+
 		self.node = node
 		self.parent = parent
 		self.globals = set()
@@ -126,6 +130,7 @@ class NameScope(object):
 
 	def addGlobalName(self, name):
 		assert isinstance(name, str), name
+		assert name not in self.locals, 'SyntaxError: %s is local and global' % name
 		self.globals.add(name)
 
 	def isGlobalScope(self):
@@ -140,17 +145,25 @@ class NameScope(object):
 
 		return self # find the global scope or None if not found
 
-	def visitModuleBody(self, node):
+	def visitModuleBody(self, node, res):
 		assert node, ast.Module
 		# let all stmts add names to the local scope
 		for stmt in node.body:
-			self.visitStmt(stmt)
+			self.visitStmt(stmt, res)
 
-	def visitStmt(self, stmt):
+	def visitStmt(self, stmt, res):
 		if isinstance(stmt, ast.FunctionDef):
 			self.onAssignName(stmt.name, FunctionValues(stmt)) # value can be a FucntionDef
+			funcScope = NameScope(stmt, self)
+			res[stmt] = funcScope
+			funcScope.visitFunctionBody(stmt, res)
+
 		elif isinstance(stmt, ast.ClassDef):
 			self.onAssignName(stmt.name, ClassValues(stmt))  # value can be a ClassDef
+			classScope = NameScope(stmt, self)
+			res[stmt] = classScope
+			classScope.visitClassBody(stmt, res )
+
 		elif isinstance(stmt, ast.Assign):
 			if len(stmt.targets) == 1:
 				self.visitAssignedNameInExpr(stmt.targets[0], stmt.value)
@@ -165,11 +178,6 @@ class NameScope(object):
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
 			for alias in stmt.names:
 				self.visitAssignedNamesInAlias(alias, anyModule)
-
-		if self.isGlobalScope() and isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
-			# if this is the module scope, and we are visiting functions or classes, put the function or class's global names to the current local names
-			for stmt in stmt.body:
-				self.visitGlobalStmt(stmt, asLocal=True)
 
 	def visitAssignedNameInExpr(self, expr, value):
 		if isinstance(expr, (ast.Attribute, ast.Subscript)):
@@ -218,19 +226,17 @@ class NameScope(object):
 
 		return anyValue
 
-	def visitGlobalStmt(self, stmt, asLocal=False):
+	def visitGlobalStmt(self, stmt):
 		if isinstance(stmt, ast.Global):
 			for name in stmt.names:
 				self.addGlobalName(name)
-		else:
-			for ss in astutils.substmts(stmt):
-				self.visitGlobalStmt(ss, asLocal=asLocal)
 
-	def visitFunctionBody(self, node):
+	def visitFunctionBody(self, node, res):
 		assert node, ast.FunctionDef
 
 		# print 'visitFunctionBody', node.name,  ast.dump(node.args)
 		# arguments = (expr * args, identifier? vararg, identifier? kwarg, expr * defaults)
+		# parse arguments first, and arguments are treated as locals
 		for i, arg in enumerate(node.args.args):
 			argValues = anyValue
 			if i == 0 and isinstance(self.parent.node, ast.ClassDef):
@@ -251,11 +257,13 @@ class NameScope(object):
 
 		# find all global names first
 		for stmt in node.body:
-			self.visitGlobalStmt(stmt, asLocal=False)
+			self.visitGlobalStmt(stmt)
+
+		print 'globals of %s is %s' % (node.name, self.globals)
 
 		# let all stmts add names to the local scope
 		for stmt in node.body:
-			self.visitStmt(stmt)
+			self.visitStmt(stmt, res)
 
 	def getFunctionType(self, node):
 		"""Get the type of a function, which can be function | instancemethod | classmethod | staticmethod"""
@@ -272,12 +280,11 @@ class NameScope(object):
 
 		return 'instancemethod'
 
-
-	def visitClassBody(self, node):
+	def visitClassBody(self, node, res):
 		assert node, ast.ClassDef
 		# let all stmts add names to the local scope
 		for stmt in node.body:
-			self.visitStmt(stmt)
+			self.visitStmt(stmt, res)
 
 	def onAssignName(self, name, value):
 		"""called when name is assigned"""
@@ -397,7 +404,8 @@ for k in consts.BUILTIN_NAMES:
 	if k.startswith('_'):
 		builtinsNameScope.onAssignName(k, anyValue)
 	else:
-		builtinsNameScope.onAssignName(k, BuiltinValues(__builtins__[k]))
+		builtinsNameScope.onAssignName(k, BuiltinValues(getattr(__builtin__, k)))
+
 for k, v in builtinsNameScope.locals.iteritems():
 	print "BUILTIN %s = %s" % (k, v)
 
@@ -407,3 +415,15 @@ def newGlobalNameScope(module):
 	for k in ['__builtins__', '__doc__', '__name__', '__package__']:
 		scope.onAssignName(k, anyValue)
 	return scope
+
+def genNameScopes(node):
+	assert isinstance(node, ast.Module)
+	nameScopes = {}
+	globalScope = newGlobalNameScope(node)
+	nameScopes[node] = globalScope
+	globalScope.visitModuleBody(node, nameScopes)
+	return nameScopes
+
+
+
+
