@@ -16,6 +16,11 @@ class PotentialValues(object):
 		self.canBeAnyValue = True
 		self.values = None # values not useful anymore
 
+	def getSingleValue(self):
+		if self.canBeAnyValue: return None
+		if len(self.values) != 1: return None
+		return list(self.values)[0]
+
 	def merge(self, otherValues):
 		if isinstance(self, AnyValue):
 			return self # AnyValue merge other => AnyValue
@@ -91,6 +96,9 @@ class FunctionValues(PotentialValues):
 		assert isinstance(node, ast.FunctionDef)
 		super(FunctionValues, self).__init__(node)
 
+class UnboundedMethodValues(FunctionValues): pass
+class BoundedMethodValues(FunctionValues): pass
+
 class ClassValues(PotentialValues):
 	def __init__(self, node):
 		assert isinstance(node, ast.ClassDef)
@@ -115,6 +123,8 @@ class NameScope(object):
 			assert isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef))
 
 		self.node = node
+		if node is not None:
+			node.scope = self # ndoe -> scope
 		self.parent = parent
 		self.globals = set()
 		self.locals = {}
@@ -191,7 +201,7 @@ class NameScope(object):
 					self.visitAssignedNameInExpr(exp, anyValue)
 		elif isinstance(expr, ast.Name):
 			if not isinstance(value, PotentialValues):
-				pv = self.getPotentialValueOfExpr(value)
+				pv = self.expr2pvs(value)
 				# print 'potential value of %s ==> %s' % (ast.dump(value), pv)
 			else:
 				pv = value # if value is PotentialValues, just keep it
@@ -204,7 +214,7 @@ class NameScope(object):
 		if alias.asname:
 			self.onAssignName(alias.asname, value)
 
-	def getPotentialValueOfExpr(self, expr):
+	def expr2pvs(self, expr):
 		if isinstance(expr, ast.Num):
 			return NumValues(expr.n)
 		elif isinstance(expr, ast.Str):
@@ -222,7 +232,6 @@ class NameScope(object):
 			return anyValue # todo: implement the transfer of values of name
 		else:
 			return anyValue # others are not supported yet
-
 
 		return anyValue
 
@@ -398,6 +407,60 @@ class NameScope(object):
 			scope = scope.parent
 
 		return False
+
+	def getPotentialValuesOfExpr(self, expr):
+		if isinstance(expr, ast.Name):
+			return self.getPotentialValues(expr.id)
+		elif isinstance(expr, ast.Attribute):
+			valuePvs = self.getPotentialValuesOfExpr(expr.value)
+			# now calculate value.attr
+			print 'getPotentialValuesOfExpr', ast.dump(expr.value), valuePvs, expr.attr
+			if isinstance(valuePvs, ClassInstanceValues):
+				# value is an instance of a class, so value.attr can be a function
+				classdef = valuePvs.classnode
+				pvs = classdef.scope.getPotentialValues(expr.attr)
+				if isinstance(pvs, FunctionValues):
+					funcdef  = pvs.getSingleValue()
+					if funcdef:
+						functype = self.getFunctionType(funcdef)
+						if functype == 'instancemethod':
+							return BoundedMethodValues(funcdef)
+						elif functype == 'classmethod':
+							return BoundedMethodValues(funcdef)
+						else:
+							return FunctionValues(funcdef)
+			# get the method ?
+			elif isinstance(valuePvs, ClassValues) and valuePvs.canBeAnyValue and len(valuePvs.values) == 1:
+				classdef = list(valuePvs.values)[0]
+				pvs = classdef.scope.getPotentialValues(expr.attr)
+				if isinstance(pvs, FunctionValues):
+					funcdef  = pvs.getSingleValue()
+					if funcdef:
+						functype = self.getFunctionType(funcdef)
+						if functype == 'instancemethod':
+							return UnboundedMethodValues(funcdef)
+						elif functype == 'classmethod':
+							return BoundedMethodValues(funcdef)
+						else:
+							return FunctionValues(funcdef)
+
+		return anyValue
+
+	def getPotentialValues(self, name):
+		if isinstance(name, ast.Name):
+			name = name.id
+		assert isinstance(name, str), repr(name)
+
+		if name in self.globals:
+			globalScope = self.getGlobalScope()
+			return globalScope.getPotentialValues(name)
+
+		while self:
+			if name in self.locals:
+				return self.locals[name]
+
+		# name not found ? that should not be happening
+		assert False, 'name %s not defined' % name
 
 builtinsNameScope = NameScope(None, None)
 for k in consts.BUILTIN_NAMES:

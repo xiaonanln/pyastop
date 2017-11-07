@@ -3,9 +3,14 @@ import time
 a = 1
 
 def foo(x, y):
+	global len
+	len = len
+	print len
 	global a
 	a = 1
 
+foo(1,2)
+print locals()
 print a
 
 #
