@@ -16,10 +16,10 @@ class A(object):
 	def __init__(self):
 		pass
 
-	def funcargsunfolding_2(self, a, b, *c):
+	def funcargsunfolding_2(self, a, b, c=1):
 		pass
 
-	def funcargsunfolding_3(self, a, b=1, c=[], **kwargs):
+	def funcargsunfolding_3(self, a, b=1, c=[], d=2, e=3):
 		pass
 
 	def funcargsunfolding_4(self):

@@ -27,7 +27,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			self.nameScopes = namescope.genNameScopes(node)
 
 		if isinstance(node, ast.AST) and hasattr(node, 'lineno'):
-			self.currentPos = node
+			self._currentNode = node
 
 		self.beforeOptimizeNode(node)
 
@@ -101,17 +101,17 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			name = self.makeName(name, ast.Store())
 
 		assignStmt = ast.Assign(targets=[name], value=expr)
-		return self._setCurrentPos(assignStmt)
+		return self.setCurrentLocation(assignStmt)
 
 	def makeName(self, id, ctx=None):
 		assert isinstance(id, str)
 		name = ast.Name(id=id, ctx=ctx or ast.Load())
-		return self._setCurrentPos(name)
+		return self.setCurrentLocation(name)
 
 	def makeNum(self, n):
 		assert isinstance(n, int)
 		num = ast.Num(n)
-		return self._setCurrentPos(num)
+		return self.setCurrentLocation(num)
 
 	# def makeCall(self, func, args):
 	# 	assert isinstance(func, str)
@@ -122,19 +122,22 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 		return isinstance(node, ast.Name) and node.id == name
 
-	def _setCurrentPos(self, node):
-		if self.currentPos is not None:
-			node.lineno = self.currentPos.lineno
-			node.col_offset = self.currentPos.col_offset
-			ast.fix_missing_locations(node)
+	def setCurrentLocation(self, node):
+		if self._currentNode is not None:
+			return self.copyLocation(node, self._currentNode)
 		else:
 			node.lineno = node.col_offset = 0
 
 		return node
 
+	def copyLocation(self, newnode, oldnode):
+		ast.copy_location(newnode, oldnode)
+		ast.fix_missing_locations(newnode)
+		return newnode
+
 	def py2ast(self, v, ctx=None):
 		node = BaseASTOptimizer._py2ast(v, ctx)
-		return self._setCurrentPos(node)
+		return self.setCurrentLocation(node)
 
 	@staticmethod
 	def _py2ast(v, ctx):

@@ -24,12 +24,71 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 			# no argument need to expand
 			return call, False
 
+		assert not (call.starargs and call.kwargs), 'should not have both *args and **kwargs: %s' % self.node2src(call)
+
 		func, bounded = self.tryDetermineFunction(call.func)
-		print 'FuncArgsUnfoldingASTOptimizer.tryOptimizeCall: func of %s is %s, bounded %s' % (ast.dump(call.func), func, bounded)
 		if not func:
 			return call, False
 
-		return call, False
+		assert isinstance(func, ast.FunctionDef)
+		# 	arguments = (expr* args, identifier? vararg, identifier? kwarg, expr* defaults)
+		# if func.args.vararg or func.args.kwarg:
+		# 	return call, False # if function def has *arg or **kwargs, do not optimize
+		#
+
+		print 'FuncArgsUnfoldingASTOptimizer.tryOptimizeCall: func of %s is %s, bounded %s' % (ast.dump(call.func), func, bounded)
+		argstart = 1 if bounded else 0
+		argname2index = {}
+		for i, arg in enumerate(func.args.args):
+			if i < argstart: continue
+			if isinstance(arg, ast.Name):
+				argname2index[arg.id] = i - argstart
+
+		callargs = list(call.args)
+		if call.starargs:
+			if not isinstance(call.starargs, (ast.List, ast.Tuple, ast.Set) ):
+				return call, False
+
+			callargs = callargs + call.starargs.elts # call.starargs must be list, tuple, ...
+
+		keys = []
+		values = []
+		# keyword = (identifier arg, expr value)
+		if call.keywords:
+			keys += [kw.arg for kw in call.keywords]
+			values += [kw.value for kw in call.keywords]
+
+		if call.kwargs:
+			if not isinstance(call.kwargs, ast.Dict):
+				return call, False
+
+			for k in call.kwargs.keys:
+				if not isinstance(k, ast.Name):
+					return call, False
+
+			keys += [k.id for k in call.kwargs.keys]
+			values += call.kwargs.values
+
+		assert len(keys) == len(values)
+		for key, val in zip(keys, values):
+			assert key in argname2index, 'argument %s is not valid' % key
+			argindex = argname2index[key]
+			while argindex >= len(callargs):
+				callargs.append(None)
+
+			assert callargs[argindex] is None, 'duplicate argument %s' % key
+			callargs[argindex] = val
+
+		for i, arg in enumerate(callargs):
+			if arg is None:
+				return call, False
+
+		newcall = ast.Call(call.func, callargs, [], None, None)
+		newcall = self.copyLocation(newcall, call)
+		print 'Old call: %s' % self.node2src(call)
+		print 'New call: %s' % self.node2src(newcall)
+		return newcall, True
+		# return call, False
 
 	def tryDetermineFunction(self, func):
 		pvs = self.currentScope.getPotentialValuesOfExpr(func)
