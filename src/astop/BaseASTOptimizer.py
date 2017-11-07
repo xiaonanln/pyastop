@@ -37,7 +37,6 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		self.optimizeChildren(node) # optimize children before optimizing parent node
 		# print 'optimizing ', self.node2src(node),
 		optnode, optimized = self.optimize(node)
-		print ''
 		assert optnode is not None
 		if optimized:
 			print >>sys.stderr, """File "%s", line %d, %s ==> %s""" % (self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
