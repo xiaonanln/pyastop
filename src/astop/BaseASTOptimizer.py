@@ -37,6 +37,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		self.optimizeChildren(node) # optimize children before optimizing parent node
 		# print 'optimizing ', self.node2src(node),
 		optnode, optimized = self.optimize(node)
+		# assert not isinstance(optnode, list), self.node2src(optnode)
 		assert optnode is not None
 		if optimized:
 			print >>sys.stderr, """File "%s", line %d, %s ==> %s""" % (self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
@@ -133,6 +134,11 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		return isinstance(node, ast.Name) and node.id == name
 
 	def setCurrentLocation(self, node):
+		if isinstance(node, list):
+			for _node in node:
+				self.setCurrentLocation(_node)
+			return
+
 		if self._currentNode is not None:
 			return self.copyLocation(node, self._currentNode)
 		else:
@@ -269,4 +275,12 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 		n = (stop - start + step - 1) // step
 		return n, True
+
+	def info(self, format, *args):
+		msg = format % args
+		print >>sys.stderr, 'File "%s", line %d: %s' % (self.source, self.currentLineno(), msg)
+
+	def debug(self, format, *args):
+		msg = format % args
+		print >>sys.stderr, 'File "%s", line %d: %s' % (self.source, self.currentLineno(), msg)
 

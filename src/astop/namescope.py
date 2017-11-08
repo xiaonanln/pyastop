@@ -2,6 +2,7 @@ import ast
 import astutils
 import consts
 import __builtin__
+from collections import defaultdict
 
 class PotentialValues(object):
 	def __init__(self, *values):
@@ -128,6 +129,7 @@ class NameScope(object):
 		self.parent = parent
 		self.globals = set()
 		self.locals = {}
+		self._genLocalNameSeqs = defaultdict(int)
 
 	def isNameResolved(self, name):
 		if name in self.globals:
@@ -462,6 +464,13 @@ class NameScope(object):
 
 		# can not resolve
 		return anyValue
+
+	def newLocalName(self, prefix):
+		# localName = self._genLocalName(prefix)
+		seq = self._genLocalNameSeqs[prefix] = self._genLocalNameSeqs[prefix] + 1
+		localName = "_pyastop_" + prefix + "_" + str(seq)
+		self.locals[localName] = anyValue
+		return localName
 
 builtinsNameScope = NameScope(None, None)
 for k in consts.BUILTIN_NAMES:

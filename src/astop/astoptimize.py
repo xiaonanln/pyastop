@@ -1,5 +1,6 @@
 import sys
 import ast
+import astutils
 from itertools import izip
 
 import compileutils
@@ -7,7 +8,7 @@ from astop import codegen
 # from globalanalyze import GlobalAnalyzeVisitor
 from constfolding import ConstFoldingASTOptimizer
 from funcargsunfolding import FuncArgsUnfoldingASTOptimizer
-from inlining import InliningASTOptimizer
+from simplefuncinlining import SimpleFuncInliningASTOptimizer
 from loopunfolding import LoopUnfoldingASTOptimizer
 from deadcodeeliminating import DeadCodeEliminatingASTOptimizer
 
@@ -40,6 +41,7 @@ def astoptimize(sources):
 			outputfd.write(optCode)
 
 		checkExprContext(moduleAST)
+		astutils.check_missing_lineno(moduleAST)
 		code = compile(moduleAST, src, "exec")
 		compileutils.writeCodeToPyc(code, src + 'c')
 
@@ -57,7 +59,7 @@ def optimizeModuleAST(moduleAST):
 			LoopUnfoldingASTOptimizer,
 			FuncArgsUnfoldingASTOptimizer,
 			DeadCodeEliminatingASTOptimizer,
-			InliningASTOptimizer):
+			SimpleFuncInliningASTOptimizer):
 
 		optimizer = optimizerClass()
 		print >>sys.stderr, 'Running %s on %s ...' % (optimizerClass.__name__, moduleAST.source)

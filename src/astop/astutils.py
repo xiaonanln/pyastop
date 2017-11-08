@@ -43,9 +43,19 @@ def evalLen(expr):
 
 def substmts(stmt):
 	"""Get all direct sub statements"""
-	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally, ast.ExceptHandler)):
+	if isinstance(stmt, list):
+		for ss in stmt:
+			yield ss
+
+	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
 		for ss in stmt.body:
 			yield ss
+
+	if isinstance(stmt, ast.TryExcept):
+		for handler in stmt.handlers:
+			# ExceptHandler(expr? type, expr? name, stmt* body)
+			for ss in handler.body:
+				yield ss
 
 	if isinstance(stmt, (ast.For, ast.While, ast.If, ast.TryExcept)):
 		for ss in stmt.orelse:
@@ -56,6 +66,26 @@ def substmts(stmt):
 			yield ss
 
 	return
+
+def substmts_recursive(body):
+	for ss in substmts(body):
+		for _ss in substmts_recursive(ss):
+			yield _ss
+		yield ss
+
+def subnodes_recursive(node):
+	if isinstance(node, list):
+		for sn in node:
+			for ssn in ast.iter_child_nodes(sn):
+				yield ssn
+			yield sn
+
+		return
+
+	for sn in ast.iter_child_nodes(node):
+		for ssn in subnodes_recursive(sn):
+			yield ssn
+		yield sn
 
 def getcallarg0(call):
 	assert isinstance(call, ast.Call)
@@ -72,4 +102,22 @@ def copy_node(node):
 	newnode = node.__class__(*fields)
 	ast.copy_location(newnode, node)
 	return newnode
+
+def getAssignedNames(expr):
+	if isinstance(expr, ast.Name):
+		yield expr
+	elif isinstance(expr, (ast.List, ast.Tuple)):
+		for subexp in expr.elts:
+			for name in getAssignedNames(subexp):
+				yield name
+
+def check_missing_lineno(node):
+	if not isinstance(node, ast.AST):
+		return
+
+	if isinstance(node, (ast.expr, ast.stmt, ast.excepthandler)):
+		assert hasattr(node, 'lineno') and hasattr(node, 'col_offset'), ast.dump(node)
+
+	for child in ast.iter_child_nodes(node):
+		check_missing_lineno(child)
 

@@ -92,10 +92,7 @@ class FuncArgsUnfoldingASTOptimizer(BaseASTOptimizer):
 
 		newcall = ast.Call(call.func, callargs, [], None, None)
 		newcall = self.copyLocation(newcall, call)
-		# print 'Old call: %s' % self.node2src(call)
-		# print 'New call: %s' % self.node2src(newcall)
 		return newcall, True
-		# return call, False
 
 	def tryDetermineFunction(self, func):
 		pvs = self.currentScope.getPotentialValuesOfExpr(func)
