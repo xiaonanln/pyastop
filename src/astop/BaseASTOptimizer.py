@@ -44,6 +44,10 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			self._optimized += 1
 			node = optnode
 
+		for subnode in astutils.subnodes_recursive(node):
+			if isinstance(subnode, (ast.stmt, ast.expr)):
+				assert not hasattr(subnode, '_optimize_expr_with_stmts'), ast.dump(subnode)
+
 		self.afterOptimizeNode(node)
 		return node
 

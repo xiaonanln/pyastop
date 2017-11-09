@@ -10,26 +10,19 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 	RequireTypeInference = True
 
 	def optimize(self, node):
-
-		if isinstance(node, ast.stmt):
-			return self.tryOptimizeStmt(node)
-
-		elif isinstance(node, ast.expr):
-			if not isinstance(node, ast.Call):
-				return node, False
-
-			# Call(expr func, expr * args, keyword * keywords, expr? starargs, expr? kwargs)
-			node, opted = self.tryOptimizeCall(node)
-			assert isinstance(node, ast.expr), ast.dump(node)
-			return node, opted
-		else:
+		if not isinstance(node, ast.Call):
 			return node, False
+
+		# Call(expr func, expr * args, keyword * keywords, expr? starargs, expr? kwargs)
+		node, opted = self.tryOptimizeCall(node)
+		assert isinstance(node, ast.expr), ast.dump(node)
+		return node, opted
 
 	def tryOptimizeStmt(self, stmt):
 		if isinstance(stmt, ast.Expr):
-			if hasattr(stmt.value, '_simplefuncinlining_optimize'):
+			if hasattr(stmt.value, '_optimize_expr_with_stmts'):
 				# value is optimized, so pass optimization to this stmt
-				optval, optstmts = stmt.value._simplefuncinlining_optimize
+				optval, optstmts = stmt.value._optimize_expr_with_stmts
 				print 'optval', ast.dump(optval)
 				print 'optstmts', self.node2src(optstmts)
 				newstmt = ast.Expr(optval)
@@ -115,7 +108,7 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		self.debug( 'SimpleFuncInliningASTOptimizer: inlining %s, arguments: %s, func locals: %s ==> %s', self.node2src(call), self.node2src(callargs), func.scope.locals.keys(),
 		            self.node2src(stmts))
 
-		call._simplefuncinlining_optimize = (retexpr, stmts)
+		call._optimize_expr_with_stmts = (retexpr, stmts)
 		return call, True
 
 	def _inlineFunction(self, call, func):
