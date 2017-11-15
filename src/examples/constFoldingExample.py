@@ -20,7 +20,7 @@ a = 1 + 1
 # def foo1():
 # 	len = lambda x: x
 # 	print len("abc")
-# #
+
 # def foo2():
 # 	global bool
 # 	bool = lambda x: False

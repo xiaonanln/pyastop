@@ -14,15 +14,10 @@ def children(node):
 		else:
 			yield c
 
-def subexprs(expr):
-	if isinstance(expr, ast.BoolOp):
-		return expr.values
-	elif isinstance(expr, ast.BinOp):
-		return [expr.left, expr.right]
-	elif isinstance(expr, ast.UnaryOp):
-		return [expr.operand]
-	elif isinstance(ast.Lambda):
-		pass
+def subexprs(node):
+	for subnode in ast.iter_child_nodes(node):
+		if isinstance(subnode, ast.expr):
+			yield subnode
 
 def isexpr(node):
 	return isinstance(node, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.Lambda, ast.IfExp, ast.Dict, ast.Set,

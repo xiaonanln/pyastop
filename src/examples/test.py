@@ -1,48 +1,44 @@
+
 import time
 
-a = 1
+_f = [0]
+def f(n):
+	print 'f', n
+	return _f
 
-def foo(x, y):
-	global len
-	len = len
-	print len
-	global a
-	a = 1
-	xxx
+def E(v, e=None):
+	print 'E', v
+	return e if e is not None else v
 
-foo(1,2)
-print locals()
-print a
-xxx
-#xxx
-#
-#
-# def f(a, b, c, d):
-# 	pass
-#
-# t0 = time.time()
-# for i in xrange(1000000):
-# 	f(1, 2, 3, 4)
-#
-#
-# print time.time() - t0; t0 = time.time()
-#
-# args = [1,2,3,4]
-# for i in xrange(1000000):
-# 	f(*args)
-#
-#
-# print time.time() - t0; t0 = time.time()
-#
-# for i in xrange(1000000):
-# 	f(1, b=2, c=3, d=4)
-#
-#
-# print time.time() - t0; t0 = time.time()
-#
-# kwargs= {'b':2, 'c': 3, 'd': 4}
-# for i in xrange(1000000):
-# 	f(1, **kwargs)
-#
-# print time.time() - t0; t0 = time.time()
-#
+exec(E(1, "1"), E(2, {}), E(3, {}))
+
+
+class A(object):
+
+    def __init__(self):
+        self.val = 1
+
+    def inlineMethod1(self, a):
+        self.val += a
+        return self.val
+
+    def inlineMethod2(self, a):
+        self.val += a
+        return
+
+    def testInline1(self):
+        self.val += 1
+        self.val
+
+    def testInline2(self):
+	    self.inlineMethod1(1)
+
+a = A()
+t0 = time.time()
+for i in xrange(1000000):
+	a.testInline1()
+
+print time.time() - t0; t0 = time.time()
+for i in xrange(1000000):
+	a.testInline2()
+print time.time() - t0; t0 = time.time()

@@ -6,7 +6,7 @@ import astop
 import os
 import ast
 
-c = ast.parse("a, b = b, a", "noname")
+c = ast.parse("with a as b: print b", "noname")
 print dir(c)
 print ast.dump(c)
 

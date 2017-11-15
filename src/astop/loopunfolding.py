@@ -45,7 +45,7 @@ class LoopUnfoldingASTOptimizer(BaseASTOptimizer):
 		newBody = []
 		for iterVal in expandIter:
 			# print >>sys.stderr, 'assigning', iterVal
-			assign = self.makeAssignStmt(node.target, iterVal)
+			assign = self.makeAssign(node.target, iterVal)
 			newBody.append(assign)
 			newBody += node.body
 

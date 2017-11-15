@@ -65,6 +65,9 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 
 			callargs = callargs + call.starargs.elts # call.starargs must be list, tuple, ...
 
+		assert len(callargs) <= len(func.args.args), 'too many arguments'
+		callargs += [None] * (len(func.args.args) - len(callargs))
+
 		keys = []
 		values = []
 		# keyword = (identifier arg, expr value)
@@ -87,9 +90,6 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		for key, val in zip(keys, values):
 			assert key in argname2index, 'argument %s is not valid' % key
 			argindex = argname2index[key]
-			while argindex >= len(callargs):
-				callargs.append(None)
-
 			assert callargs[argindex] is None, 'duplicate argument %s' % key
 			callargs[argindex] = val
 
@@ -103,50 +103,64 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 
 				callargs[i] = astutils.copy_node(defaultval)
 
+		assert len(func.args.args) == len(callargs), (func.args.args, callargs)
 		# start inlining ...
-		retexpr, stmts = self._inlineFunction(call, func)
+
+		retexpr, stmts = self._inlineFunction(call, func, callargs)
 		self.debug( 'SimpleFuncInliningASTOptimizer: inlining %s, arguments: %s, func locals: %s ==> %s', self.node2src(call), self.node2src(callargs), func.scope.locals.keys(),
 		            self.node2src(stmts))
 
 		call._optimize_expr_with_stmts = (retexpr, stmts)
 		return call, True
 
-	def _inlineFunction(self, call, func):
+	def _inlineFunction(self, call, func, callargs):
 		# step 1: generate new local name for return value
 		returnName = self.currentScope.newLocalName("inline")
 		# inline the target function body
 		# replace all locals in target function
 		replaceNames = {}
+		assignparams = []
 		for localName in func.scope.locals:
 			newLocalName = self.currentScope.newLocalName("inline")
 			replaceNames[localName] = newLocalName
 
+		assignargs = []
+		for arg, argval in zip( func.args.args, callargs ):
+			assignargs.append(self.makeAssign(self._inlineNode(arg, replaceNames, returnName), argval))
+
 		# step 1: replace all locals in called function
 		# replace all names in stmts
-		newbody = [self._inlineNode(stmt, replaceNames) for stmt in func.body]
-		self.debug("new body: %s", self.node2src(newbody))
+		newbody = [self._inlineNode(stmt, replaceNames, returnName) for stmt in func.body]
 		for stmt in newbody:
 			astutils.check_missing_lineno(stmt)
-		return call, newbody
+		return self.makeName(returnName, ast.Load()), assignargs + newbody
 
-	def _inlineNode(self, node, replaceNames):
+	def _inlineNode(self, node, replaceNames, returnName):
 		assert isinstance(node, (list, ast.AST, bool, type(None), str, int)), type(node)
 		if isinstance(node, ast.Name) and node.id in replaceNames:
-			newname = ast.Name(replaceNames[node.id], node.ctx)
+			ctx = node.ctx
+			if isinstance(ctx, ast.Param):
+				ctx = ast.Store()
+			newname = ast.Name(replaceNames[node.id], ctx)
 			ast.copy_location(newname, node)
-			astutils.check_missing_lineno(newname)
+			# astutils.check_missing_lineno(newname)
 			return newname
 
 		if isinstance(node, list):
-			return [self._inlineNode(subnode, replaceNames) for subnode in node]
+			return [self._inlineNode(subnode, replaceNames, returnName) for subnode in node]
 
 		if isinstance(node, ast.AST):
 			# this is a node
-			fields = tuple( self._inlineNode(getattr(node, k), replaceNames) for k in node._fields)
+			fields = tuple( self._inlineNode(getattr(node, k), replaceNames, returnName) for k in node._fields)
 			assert 'lineno' not in node._fields
 			newnode = node.__class__(*fields)
 			ast.copy_location(newnode, node)
-			astutils.check_missing_lineno(newnode)
+			# astutils.check_missing_lineno(newnode)
+
+			if isinstance(newnode, ast.Return):
+				retval = newnode.value or self.makeName('None')
+				newnode = self.makeAssign(returnName, retval)
+
 			return newnode
 		else: # python types
 			return node
