@@ -44,23 +44,24 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			self._optimized += 1
 			node = optnode
 
-		node = self.resolveSubExprOptimizeWithStmts(node)
+		if isinstance(node, ast.stmt):
+			node = self.resolveExprOptimizeWithStmts(node)
+
+		assert node is not None
 		self.afterOptimizeNode(node)
 		return node
 
 	def currentLineno(self):
 		return self._currentNode.lineno if self._currentNode else 0
 
-	def resolveSubExprOptimizeWithStmts(self, node):
+	def resolveExprOptimizeWithStmts(self, node):
 		# print 'resolveSubExprOptimizeWithStmts', node
 		if isinstance(node, ast.expr):
-
 			for subnode in astutils.subexprs(node):
 				assert not hasattr(subnode, '_optimize_expr_with_stmts'), self.node2src(node)
-			return self.resolveExprSubExprOptimizeWithStmts(node)
-			return node
+			return self._resolveExprOptimizeWithStmts_expr(node)
 		elif isinstance(node, ast.stmt):
-			return self.resolveStmtSubExprOptimizeWithStmts(node)
+			return self._resolveExprOptimizeWithStmts_stmt(node)
 		# elif isinstance(node, list):
 		# 	newstmts = []
 		# 	for stmt in node:
@@ -75,14 +76,13 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		else:
 			return node
 
-	def resolveExprSubExprOptimizeWithStmts(self, expr):
+	def _resolveExprOptimizeWithStmts_expr(self, expr):
 		assert isinstance(expr, ast.expr)
 		if hasattr(expr, '_optimize_expr_with_stmts'):
 			# use outmost optimization
-			return self._clearSubExprOptimizeWithStmts(expr)
+			return self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
 
 		prev_stmts = []
-
 
 
 		if isinstance(expr, ast.BoolOp):
@@ -92,14 +92,16 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			expr.right = self._resolveExprOptimizeWithStmts(expr.right, prev_stmts)
 			expr._optimize_expr_with_stmts = prev_stmts
 
+		return expr
 
-	def resolveStmtSubExprOptimizeWithStmts(self, stmt):
+
+	def _resolveExprOptimizeWithStmts_stmt(self, stmt):
 		assert isinstance(stmt, ast.stmt), ast.dump(stmt)
 		if isinstance(stmt, (ast.FunctionDef, ast.ClassDef)): # these statements are unsolvable
-			return self._clearSubExprOptimizeWithStmts(stmt)
+			return self._resolveExprOptimizeWithStmts_clearsubexprs(stmt)
 
 		if isinstance(stmt, (ast.Raise, ast.TryExcept)): # todo: these statements should be solvable, but not solved yet
-			return self._clearSubExprOptimizeWithStmts(stmt)
+			return self._resolveExprOptimizeWithStmts_clearsubexprs(stmt)
 
 		if isinstance(stmt, (ast.TryFinally, ast.ImportFrom, ast.Import, ast.Global, ast.Pass, ast.Break, ast.Continue)): # these statements has no sub exprs
 			return stmt
@@ -170,11 +172,13 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			exprs[i] = self._resolveExprOptimizeWithStmts(expr, stmts)
 		return exprs
 
-	def _clearSubExprOptimizeWithStmts(self, node):
+	def _resolveExprOptimizeWithStmts_clearsubexprs(self, node):
 		assert isinstance(node, (ast.stmt, ast.expr))
-		for subnode in ast.iter_child_nodes(node):
+		for subnode in astutils.subexprs(node):
 			if isinstance(subnode, ast.expr) and hasattr(subnode, '_optimize_expr_with_stmts'):
 				del subnode._optimize_expr_with_stmts
+				self._resolveExprOptimizeWithStmts_clearsubexprs(subnode)
+
 		return node
 
 	def beforeOptimizeNode(self, node):
