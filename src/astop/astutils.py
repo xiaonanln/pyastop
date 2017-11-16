@@ -25,6 +25,20 @@ def isexpr(node):
 	                         ast.Repr, ast.Num, ast.Str, ast.Attribute, ast.Subscript, ast.Name, ast.List, ast.Tuple
 	                         ))
 
+def isSideEffectFreeExpr(expr):
+	assert isinstance(expr, ast.expr)
+	if isinstance(expr, (ast.Name, ast.Num, ast.Str)): # these expr is side-affect free
+		return True
+
+	if isinstance(expr, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.IfExp, ast.Dict, ast.Set, ast.Compare, ast.Repr, ast.List, ast.Tuple)):
+		# these exprs are side-affect free if sub-exprs are all side-effect free
+		for subexpr in subexprs(expr):
+			if not isSideEffectFreeExpr(subexpr):
+				return False
+		return True
+
+	return False
+
 # def isConstComprehension(comp):
 # 	return all(isConstantExpr(e) for e in [comp.target, comp.iter] + comp.ifs)
 
@@ -115,4 +129,5 @@ def check_missing_lineno(node):
 
 	for child in ast.iter_child_nodes(node):
 		check_missing_lineno(child)
+
 

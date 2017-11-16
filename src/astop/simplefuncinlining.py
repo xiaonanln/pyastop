@@ -115,13 +115,13 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 
 	def _inlineFunction(self, call, func, callargs):
 		# step 1: generate new local name for return value
-		returnName = self.currentScope.newLocalName("inline")
+		returnName = self.currentScope.newLocalName("inl")
 		# inline the target function body
 		# replace all locals in target function
 		replaceNames = {}
 		assignparams = []
 		for localName in func.scope.locals:
-			newLocalName = self.currentScope.newLocalName("inline")
+			newLocalName = self.currentScope.newLocalName("inl")
 			replaceNames[localName] = newLocalName
 
 		assignargs = []

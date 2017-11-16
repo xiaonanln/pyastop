@@ -5,10 +5,13 @@ import sys
 import astop
 import os
 import ast
+from astop import codegen
 
-c = ast.parse("with a as b: print b", "noname")
-print dir(c)
-print ast.dump(c)
+# c = ast.parse("with a as b: print b", "noname")
+# print dir(c)
+# print ast.dump(c)
+
+print codegen.to_source(ast.Repr(ast.Num(1)))
 
 def main():
 	args = parseArgs(sys.argv[1:])

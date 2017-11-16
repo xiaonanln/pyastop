@@ -45,7 +45,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			node = optnode
 
 		if isinstance(node, ast.stmt):
-			node = self.resolveExprOptimizeWithStmts(node)
+			node = self._resolveExprOptimizeWithStmts_stmt(node)
 
 		assert node is not None
 		self.afterOptimizeNode(node)
@@ -54,45 +54,27 @@ class BaseASTOptimizer(ast.NodeTransformer):
 	def currentLineno(self):
 		return self._currentNode.lineno if self._currentNode else 0
 
-	def resolveExprOptimizeWithStmts(self, node):
-		# print 'resolveSubExprOptimizeWithStmts', node
-		if isinstance(node, ast.expr):
-			for subnode in astutils.subexprs(node):
-				assert not hasattr(subnode, '_optimize_expr_with_stmts'), self.node2src(node)
-			return self._resolveExprOptimizeWithStmts_expr(node)
-		elif isinstance(node, ast.stmt):
-			return self._resolveExprOptimizeWithStmts_stmt(node)
-		# elif isinstance(node, list):
-		# 	newstmts = []
-		# 	for stmt in node:
-		# 		stmt = self.resolveStmtSubExprOptimizeWithStmts(stmt)
-		# 		if isinstance(stmt, ast.stmt):
-		# 			newstmts.append(stmt)
-		# 		else:
-		# 			assert isinstance(stmt, list)
-		# 			newstmts.extend(stmt)
-		#
-		# 	return newstmts
-		else:
-			return node
-
-	def _resolveExprOptimizeWithStmts_expr(self, expr):
-		assert isinstance(expr, ast.expr)
-		if hasattr(expr, '_optimize_expr_with_stmts'):
-			# use outmost optimization
-			return self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
-
-		prev_stmts = []
-
-
-		if isinstance(expr, ast.BoolOp):
-			return expr
-		elif isinstance(expr, ast.BinOp): # BinOp(expr left, operator op, expr right)
-			expr.left = self._resolveExprOptimizeWithStmts(expr.left, prev_stmts)
-			expr.right = self._resolveExprOptimizeWithStmts(expr.right, prev_stmts)
-			expr._optimize_expr_with_stmts = prev_stmts
-
-		return expr
+	# def resolveExprOptimizeWithStmts(self, node):
+	# 	# print 'resolveSubExprOptimizeWithStmts', node
+	# 	if isinstance(node, ast.expr):
+	# 		for subnode in astutils.subexprs(node):
+	# 			assert not hasattr(subnode, '_optimize_expr_with_stmts'), self.node2src(node)
+	# 		return self._resolveExprOptimizeWithStmts_expr(node)
+	# 	elif isinstance(node, ast.stmt):
+	# 		return self._resolveExprOptimizeWithStmts_stmt(node)
+	# 	# elif isinstance(node, list):
+	# 	# 	newstmts = []
+	# 	# 	for stmt in node:
+	# 	# 		stmt = self.resolveStmtSubExprOptimizeWithStmts(stmt)
+	# 	# 		if isinstance(stmt, ast.stmt):
+	# 	# 			newstmts.append(stmt)
+	# 	# 		else:
+	# 	# 			assert isinstance(stmt, list)
+	# 	# 			newstmts.extend(stmt)
+	# 	#
+	# 	# 	return newstmts
+	# 	else:
+	# 		return node
 
 
 	def _resolveExprOptimizeWithStmts_stmt(self, stmt):
@@ -106,70 +88,161 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		if isinstance(stmt, (ast.TryFinally, ast.ImportFrom, ast.Import, ast.Global, ast.Pass, ast.Break, ast.Continue)): # these statements has no sub exprs
 			return stmt
 
-		prev_stmts = []
-		if isinstance(stmt, ast.Return):
-			stmt.value = self._resolveExprOptimizeWithStmts(stmt.value, prev_stmts)
+		prevStmts = []
+		if isinstance(stmt, (ast.Return, )): # exprs with only value as sub-expr
+			stmt.value = self._resolveExprOptimizeWithStmts_expr(stmt.value, prevStmts)
 
 		elif isinstance(stmt, ast.Delete):
-			stmt.targets = self._resolveExprListOptimizeWithStmts(stmt.targets, prev_stmts)
+			stmt.targets = self._resolveExprOptimizeWithStmts_exprlist(stmt.targets, prevStmts)
 		elif isinstance(stmt, ast.Assign):
-			stmt.value = self._resolveExprOptimizeWithStmts(stmt.value, prev_stmts) # resolve value first
-			stmt.targets = self._resolveExprListOptimizeWithStmts(stmt.targets, prev_stmts) # resolve
+			stmt.value = self._resolveExprOptimizeWithStmts_expr(stmt.value, prevStmts) # resolve value first
+			stmt.targets = self._resolveExprOptimizeWithStmts_exprlist(stmt.targets, prevStmts) # resolve
 		elif isinstance(stmt, ast.AugAssign):
-			stmt.value = self._resolveExprOptimizeWithStmts(stmt.value, prev_stmts) # resolve value first
-			stmt.target = self._resolveExprOptimizeWithStmts(stmt.target, prev_stmts)  # resolve value first
+			stmt.value = self._resolveExprOptimizeWithStmts_expr(stmt.value, prevStmts) # resolve value first
+			stmt.target = self._resolveExprOptimizeWithStmts_expr(stmt.target, prevStmts)  # resolve value first
 		elif isinstance(stmt, ast.Print):
-			stmt.dest = self._resolveExprOptimizeWithStmts(stmt.dest, prev_stmts)  # resolve value first
-			stmt.values = self._resolveExprListOptimizeWithStmts(stmt.values, prev_stmts)  # resolve value first
+			stmt.dest = self._resolveExprOptimizeWithStmts_expr(stmt.dest, prevStmts)  # resolve value first
+			stmt.values = self._resolveExprOptimizeWithStmts_exprlist(stmt.values, prevStmts)  # resolve value first
 		elif isinstance(stmt, ast.For): # For(expr target, expr iter, stmt* body, stmt* orelse)
-			stmt.iter = self._resolveExprOptimizeWithStmts(stmt.iter, prev_stmts)
-			stmt.target = self._ignoreExprOptimizeWithStmts(stmt.target) # we do not support optimized target ...
+			stmt.iter = self._resolveExprOptimizeWithStmts_expr(stmt.iter, prevStmts)
+			stmt.target = self._resolveExprOptimizeWithStmts_ignore(stmt.target) # we do not support optimized target ...
 		elif isinstance(stmt, ast.While): # While(expr test, stmt* body, stmt* orelse)
-			stmt.test = self._ignoreExprOptimizeWithStmts(stmt.test)
+			stmt.test = self._resolveExprOptimizeWithStmts_ignore(stmt.test)
 		elif isinstance(stmt, ast.If): # If(expr test, stmt* body, stmt* orelse)
-			stmt.test = self._resolveExprOptimizeWithStmts(stmt.test, prev_stmts)
+			stmt.test = self._resolveExprOptimizeWithStmts_expr(stmt.test, prevStmts)
 		elif isinstance(stmt, ast.With): # With(expr context_expr, expr? optional_vars, stmt* body)
-			stmt.context_expr = self._resolveExprOptimizeWithStmts(stmt.context_expr, prev_stmts)
-			stmt.optional_vars = self._resolveExprOptimizeWithStmts(stmt.optional_vars, prev_stmts)
+			stmt.context_expr = self._resolveExprOptimizeWithStmts_expr(stmt.context_expr, prevStmts)
+			stmt.optional_vars = self._resolveExprOptimizeWithStmts_expr(stmt.optional_vars, prevStmts)
 		elif isinstance(stmt, ast.Assert): # Assert(expr test, expr? msg)
-			stmt.test = self._resolveExprOptimizeWithStmts(stmt.test, prev_stmts)
-			stmt.msg = self._ignoreExprOptimizeWithStmts(stmt.msg) # todo: msg not resolved yet
+			stmt.test = self._resolveExprOptimizeWithStmts_expr(stmt.test, prevStmts)
+			stmt.msg = self._resolveExprOptimizeWithStmts_ignore(stmt.msg) # todo: msg not resolved yet
 		elif isinstance(stmt, ast.Exec): #Exec(expr body, expr? globals, expr? locals)
-			stmt.body = self._resolveExprOptimizeWithStmts(stmt.body, prev_stmts)
-			stmt.globals = self._resolveExprOptimizeWithStmts(stmt.globals, prev_stmts)
-			stmt.locals = self._resolveExprOptimizeWithStmts(stmt.locals, prev_stmts)
+			stmt.body = self._resolveExprOptimizeWithStmts_expr(stmt.body, prevStmts)
+			stmt.globals = self._resolveExprOptimizeWithStmts_expr(stmt.globals, prevStmts)
+			stmt.locals = self._resolveExprOptimizeWithStmts_expr(stmt.locals, prevStmts)
 		elif isinstance(stmt, ast.Expr): # Expr(expr value)
-			stmt.value = self._resolveExprOptimizeWithStmts(stmt.value, prev_stmts)
+			stmt.value = self._resolveExprOptimizeWithStmts_expr(stmt.value, prevStmts)
 		else:
 			assert False, ast.dump(stmt)
 
-		if not prev_stmts:
+		if not prevStmts:
 			return stmt
 		else:
-			return prev_stmts + [stmt]
+			return prevStmts + [stmt]
 
-	def _ignoreExprOptimizeWithStmts(self, expr):
-		if expr is None: return None
-		if hasattr(expr, '_optimize_expr_with_stmts'):
-			del expr._optimize_expr_with_stmts
-		return expr
-
-	def _resolveExprOptimizeWithStmts(self, expr, stmts):
+	def _resolveExprOptimizeWithStmts_expr(self, expr, prevStmts):
 		if expr is None:
 			return None
 
 		assert isinstance(expr, ast.expr)
-		if not hasattr(expr, '_optimize_expr_with_stmts'):
-			return expr
-		optexpr, optstmts = expr._optimize_expr_with_stmts
-		del expr._optimize_expr_with_stmts
-		stmts.extend(optstmts)
-		return optexpr
+		if hasattr(expr, '_optimize_expr_with_stmts'):
+			self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
+			print '_optimize_expr_with_stmts', expr._optimize_expr_with_stmts
+			optexpr, optstmts = expr._optimize_expr_with_stmts
+			assert optstmts, 'at least 1 stmt'
+			del expr._optimize_expr_with_stmts
+			prevStmts.extend(optstmts)
 
-	def _resolveExprListOptimizeWithStmts(self, exprs, stmts):
+			optExprName = self.currentScope.newLocalName("expr")
+			if not astutils.isSideEffectFreeExpr(optexpr):
+				stmt = self.makeAssign(self.makeName(optExprName, ast.Store()), optexpr)
+				prevStmts.append(self.setCurrentLocation(stmt))
+				optexpr = self.makeName(optExprName)
+
+			return optexpr
+
+		if isinstance(expr, (ast.Num, ast.Str, ast.Name)): # these expr needs no further process
+			pass
+		elif isinstance(expr, ast.BoolOp): # BoolOp(boolop op, expr* values)
+			values = expr.values
+			boolop = expr.op
+
+			for i, val in enumerate(values):
+				boolopPrevStmts = []
+				values[i] = val = self._resolveExprOptimizeWithStmts_expr(val, boolopPrevStmts)
+				if boolopPrevStmts: # prev expr is optimized with stmts
+					if i > 0 and not astutils.isSideEffectFreeExpr(ast.BoolOp(boolop, values[:i])):
+						prevVar = self.currentScope.newLocalName("boolop")
+						prevExpr = ast.BoolOp(boolop, values[:i])
+						leftExpr = self._resolveExprOptimizeWithStmts_expr(ast.BoolOp(boolop, values[i:]), boolopPrevStmts)
+						if isinstance(boolop, ast.And):
+							test = self.makeName(prevVar)
+						else:
+							test = ast.UnaryOp(ast.Not(), self.makeName(prevVar))
+						boolopPrevStmts = [
+							self.makeAssign(self.makeName(prevVar, ast.Store()), prevExpr),
+							ast.If(test, boolopPrevStmts + [
+								self.makeAssign(self.makeName(prevVar, ast.Store()), leftExpr)
+							], []),
+						]
+						self.setCurrentLocation(boolopPrevStmts)
+						prevStmts.extend(boolopPrevStmts)
+						expr = self.makeName(prevVar)
+						break
+					else: # i == 0 or prev exprs are all side-effect free
+						prevStmts.extend(boolopPrevStmts)
+						continue
+		elif isinstance(expr, ast.BinOp): # BinOp(expr left, operator op, expr right)
+			expr.left = self._resolveExprOptimizeWithStmts_expr(expr.left, prevStmts)
+			expr.right = self._resolveExprOptimizeWithStmts_expr(expr.right, prevStmts)
+		elif isinstance(expr, ast.UnaryOp):
+			expr.operand = self._resolveExprOptimizeWithStmts_expr(expr.operand, prevStmts)
+		elif isinstance(expr, ast.Lambda): # can not resolve lambda
+			self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
+		elif isinstance(expr, ast.IfExp):
+			expr.test = self._resolveExprOptimizeWithStmts_expr(expr.test, prevStmts) # eval test first
+			bodyPrevStmts = []
+			orelsePrevStmts = []
+			body = self._resolveExprOptimizeWithStmts_expr(expr.body, bodyPrevStmts)
+			orelse = self._resolveExprOptimizeWithStmts_expr(expr.orelse, orelsePrevStmts)
+			if bodyPrevStmts or orelsePrevStmts:
+				# body or orelse is optimized with stmts, we need to convert IfExp to If statement
+				resVar = self.currentScope.newLocalName("ifexp")
+				ifstmt = ast.If(expr.test, bodyPrevStmts + [ self.makeAssign(self.makeName(resVar, ast.Store()), body) ],
+				       orelsePrevStmts + [ self.makeAssign(self.makeName(resVar, ast.Store()), orelse) ])
+				self.setCurrentLocation(ifstmt)
+				prevStmts.append(ifstmt)
+				expr = self.makeName(resVar)
+		elif isinstance(expr, (ast.Set, ast.List, ast.Tuple)):
+			expr.elts = self._resolveExprOptimizeWithStmts_exprlist(expr.elts, prevStmts)
+		elif isinstance(expr, ast.Dict):
+			# the evaluation order is v1, k2, v2, k2, v3, k3 ...
+			for i, k in enumerate(expr.keys): # for each key-value pair
+				expr.values[i] = self._resolveExprOptimizeWithStmts_expr(expr.values[i], prevStmts) # eval value first
+				expr.keys[i] = self._resolveExprOptimizeWithStmts_expr(k, prevStmts)  # then eval key
+		elif isinstance(expr, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp, ast.Yield)): # can not resolve these exprs
+			self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
+		elif isinstance(expr, ast.Compare): # Compare(expr left, cmpop* ops, expr* comparators)
+			expr.left = self._resolveExprOptimizeWithStmts_expr(expr.left, prevStmts)
+			expr.comparators = self._resolveExprOptimizeWithStmts_expr(expr.comparators, prevStmts)
+		elif isinstance(expr, ast.Call): # Call(expr func, expr* args, keyword* keywords, #  expr? starargs, expr? kwargs)
+			expr.func = self._resolveExprOptimizeWithStmts_expr(expr.func, prevStmts)
+			expr.args = self._resolveExprOptimizeWithStmts_exprlist(expr.args, prevStmts)
+			expr.keywords = self._resolveExprOptimizeWithStmts_keywords(expr.keywords, prevStmts)
+			expr.starargs = self._resolveExprOptimizeWithStmts_expr(expr.starargs, prevStmts)
+			expr.kwargs = self._resolveExprOptimizeWithStmts_expr(expr.kwargs, prevStmts)
+		elif isinstance(expr, (ast.Attribute, ast.Repr)): # Attribute(expr value, identifier attr, expr_context ctx)
+			expr.value = self._resolveExprOptimizeWithStmts_expr(expr.value, prevStmts)
+		elif isinstance(expr, ast.Subscript): # Subscript(expr value, slice slice, expr_context ctx)
+			expr.value = self._resolveExprOptimizeWithStmts_expr(expr.value, prevStmts)
+			expr.slice = self._resolveExprOptimizeWithStmts_slice(expr.slice, prevStmts)
+		else:
+			assert False, ('not an expr', ast.dump(expr))
+
+		return expr
+
+	def _resolveExprOptimizeWithStmts_ignore(self, expr):
+		if expr is None: return None
+		assert isinstance(expr, ast.expr)
+		self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
+		if hasattr(expr, '_optimize_expr_with_stmts'):
+			del expr._optimize_expr_with_stmts
+		return expr
+
+	def _resolveExprOptimizeWithStmts_exprlist(self, exprs, prevStmts):
 		assert isinstance(exprs, list)
 		for i, expr in enumerate(exprs):
-			exprs[i] = self._resolveExprOptimizeWithStmts(expr, stmts)
+			exprs[i] = self._resolveExprOptimizeWithStmts_expr(expr, prevStmts)
 		return exprs
 
 	def _resolveExprOptimizeWithStmts_clearsubexprs(self, node):
@@ -180,6 +253,28 @@ class BaseASTOptimizer(ast.NodeTransformer):
 				self._resolveExprOptimizeWithStmts_clearsubexprs(subnode)
 
 		return node
+
+	def _resolveExprOptimizeWithStmts_slice(self, slice, prevStmts):
+		assert isinstance(slice, ast.slice)
+		# slice = Ellipsis | Slice(expr? lower, expr? upper, expr? step)
+      # | ExtSlice(slice* dims)
+      # | Index(expr value)
+		if isinstance(slice, ast.Ellipsis):
+			return slice
+		elif isinstance(slice, ast.Slice):
+			slice.lower = self._resolveExprOptimizeWithStmts_expr(slice.lower, prevStmts)
+			slice.upper = self._resolveExprOptimizeWithStmts_expr(slice.upper, prevStmts)
+			slice.step = self._resolveExprOptimizeWithStmts_expr(slice.step, prevStmts)
+		elif isinstance(slice, ast.ExtSlice):
+			for i, ss in enumerate(slice.dims):
+				slice.dims[i] = self._resolveExprOptimizeWithStmts_slice(ss, prevStmts)
+		elif isinstance(slice, ast.Index):
+			slice.value = self._resolveExprOptimizeWithStmts_expr(slice.value, prevStmts)
+
+	def _resolveExprOptimizeWithStmts_keywords(self, keywords, prevStmts):
+		for kw in keywords:
+			kw.value = self._resolveExprOptimizeWithStmts_expr(kw.value, prevStmts)
+		return keywords
 
 	def beforeOptimizeNode(self, node):
 		if self.requireNameScopes():

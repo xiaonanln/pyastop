@@ -67,14 +67,14 @@ class MultipleTypeValues(PotentialValues):
 		else:
 			for existingValues in self.values:
 				foundSameClass = False
-				if existingValues.__class__ is values.__clas__: # merge same type
+				if existingValues.__class__ is values.__class__: # merge same type
 					self.values.remove(existingValues)
 					self.values.add( existingValues.merge(values) )
 					foundSameClass = True
 					break
 
 				if not foundSameClass:
-					self.values.add( values )
+					self.values = self.values + ( values, )
 
 class AnyValue(PotentialValues): pass
 anyValue = AnyValue()
