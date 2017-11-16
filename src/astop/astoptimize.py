@@ -48,7 +48,7 @@ def astoptimize(sources):
 	print >>sys.stderr, "=" * 80
 	print >>sys.stderr, 'astop optimized %d places in sources' % sum(C.itervalues())
 	for name, c in sorted(C.items()):
-		print >>sys.stderr, '\t%s x %d' % (name, c )
+		print >>sys.stderr, '\t%s x %d' % (name[:-12], c )
 
 def analyzeModuleAST(moduleAST):
 	pass
@@ -62,7 +62,8 @@ def optimizeModuleAST(moduleAST, C):
 			LoopUnfoldingASTOptimizer,
 			FuncArgsUnfoldingASTOptimizer,
 			DeadCodeEliminatingASTOptimizer,
-			SimpleFuncInliningASTOptimizer):
+			# SimpleFuncInliningASTOptimizer,
+	):
 
 		optimizer = optimizerClass()
 		print >>sys.stderr, 'Running %s on %s ...' % (optimizerClass.__name__, moduleAST.source)

@@ -41,7 +41,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		# assert not isinstance(optnode, list), self.node2src(optnode)
 		assert optnode is not None
 		if optimized:
-			print >>sys.stderr, """File "%s", line %d, %s ==> %s""" % (self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
+			print >>sys.stderr, """%s: File "%s", line %d, %s ==> %s""" % (self.__class__.__name__, self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
 			self._optimized += 1
 			node = optnode
 
