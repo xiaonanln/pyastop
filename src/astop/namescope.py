@@ -88,11 +88,6 @@ class TupleValues(PotentialValues): pass
 class ListValues(PotentialValues): pass
 class SetValues(PotentialValues): pass
 class DictValues(PotentialValues): pass
-class ModuleValues(PotentialValues):
-	def __init__(self):
-		super(ModuleValues, self).__init__()
-
-anyModule = ModuleValues()
 
 class BuiltinValues(PotentialValues): pass
 
@@ -186,7 +181,7 @@ class NameScope(object):
 			self.visitAssignedNameInExpr(stmt.target, ast.BinOp(stmt.target, stmt.op, stmt.value)) # target op= value ==> target = target op value
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
 			for alias in stmt.names:
-				self.visitAssignedNamesInAlias(alias, anyModule)
+				self.visitAssignedNamesInAlias(alias, anyValue)
 		else:
 			for substmt in astutils.substmts(stmt):
 				self.visitStmt(substmt, res)
@@ -215,6 +210,8 @@ class NameScope(object):
 		assert isinstance(alias, ast.alias), repr(alias)
 		if alias.asname:
 			self.onAssignName(alias.asname, value)
+		else:
+			self.onAssignName(alias.name, value)
 
 	def expr2pvs(self, expr):
 		if isinstance(expr, ast.Num):
@@ -457,10 +454,16 @@ class NameScope(object):
 			globalScope = self.getGlobalScope()
 			return globalScope.getPotentialValues(name)
 
-		while self:
-			if name in self.locals:
-				return self.locals[name]
-			self = self.parent
+		elif name in self.locals:
+			return self.locals[name]
+
+		parent = self.parent
+		while parent:
+			if not isinstance(parent.node, ast.ClassDef):
+				if name in parent.locals:
+					return parent.locals[name]
+
+			parent = parent.parent
 
 		# can not resolve
 		return anyValue

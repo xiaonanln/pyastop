@@ -10,6 +10,16 @@ def E(v, e=None):
 	return e if e is not None else v
 
 
-# E("func", f)( E("arg1"), E("arg2"), *E("starargs", []), a=E("keyward"), **E("kwargs", {}) )
 
-print E("value", [1,2,3])[E("lower"):E("upper"):E("step")]
+class A(object):
+	eval  = 1
+
+	class B(object):
+		eval = 2
+		def B(self):
+			def C():
+				print eval
+				pass
+			C()
+
+A.B().B()

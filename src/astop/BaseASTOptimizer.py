@@ -9,6 +9,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 	RequireNameScope = False # if set to True, will analyze Name Scope before optimize
 	RequireTypeInference = False # if set to True, will do type inferences
+	RequireResolveExprOptimizeWithStmts = False
 
 	def __init__(self):
 		super(BaseASTOptimizer, self).__init__()
@@ -44,8 +45,9 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			self._optimized += 1
 			node = optnode
 
-		if isinstance(node, ast.stmt):
-			node = self._resolveExprOptimizeWithStmts_stmt(node)
+		if self.RequireResolveExprOptimizeWithStmts:
+			if isinstance(node, ast.stmt):
+				node = self._resolveExprOptimizeWithStmts_stmt(node)
 
 		assert node is not None
 		self.afterOptimizeNode(node)
@@ -137,7 +139,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		assert isinstance(expr, ast.expr)
 		if hasattr(expr, '_optimize_expr_with_stmts'):
 			self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
-			print '_optimize_expr_with_stmts', expr._optimize_expr_with_stmts
+			# print '_optimize_expr_with_stmts', expr._optimize_expr_with_stmts
 			optexpr, optstmts = expr._optimize_expr_with_stmts
 			assert optstmts, 'at least 1 stmt'
 			del expr._optimize_expr_with_stmts
@@ -214,7 +216,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			self._resolveExprOptimizeWithStmts_clearsubexprs(expr)
 		elif isinstance(expr, ast.Compare): # Compare(expr left, cmpop* ops, expr* comparators)
 			expr.left = self._resolveExprOptimizeWithStmts_expr(expr.left, prevStmts)
-			expr.comparators = self._resolveExprOptimizeWithStmts_expr(expr.comparators, prevStmts)
+			expr.comparators = self._resolveExprOptimizeWithStmts_exprlist(expr.comparators, prevStmts)
 		elif isinstance(expr, ast.Call): # Call(expr func, expr* args, keyword* keywords, #  expr? starargs, expr? kwargs)
 			expr.func = self._resolveExprOptimizeWithStmts_expr(expr.func, prevStmts)
 			expr.args = self._resolveExprOptimizeWithStmts_exprlist(expr.args, prevStmts)
@@ -271,6 +273,8 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		elif isinstance(slice, ast.Index):
 			slice.value = self._resolveExprOptimizeWithStmts_expr(slice.value, prevStmts)
 
+		return slice
+
 	def _resolveExprOptimizeWithStmts_keywords(self, keywords, prevStmts):
 		for kw in keywords:
 			kw.value = self._resolveExprOptimizeWithStmts_expr(kw.value, prevStmts)
@@ -298,6 +302,14 @@ class BaseASTOptimizer(ast.NodeTransformer):
 				self.currentScope = self.currentScope.parent
 			elif isinstance(node, ast.FunctionDef):
 				self.currentScope = self.currentScope.parent
+
+	def isOnStack(self, node):
+		assert isinstance(node, (ast.FunctionDef, ast.Module, ast.ClassDef))
+		scope = self.currentScope
+		while scope and scope.node is not node:
+			scope = scope.parent
+
+		return scope is not None
 
 	def optimizeChildren(self, node):
 		self.generic_visit(node)

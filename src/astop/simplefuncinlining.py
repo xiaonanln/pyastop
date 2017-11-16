@@ -8,6 +8,7 @@ from BaseASTOptimizer import BaseASTOptimizer
 class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 
 	RequireTypeInference = True
+	RequireResolveExprOptimizeWithStmts = True
 
 	def optimize(self, node):
 		if not isinstance(node, ast.Call):
@@ -36,7 +37,12 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		# Call(expr func, expr * args, keyword * keywords, expr? starargs, expr? kwargs)
 
 		func, bounded = self.tryDetermineFunction(call.func)
+		if isinstance(call.func, ast.Name) and call.func.id == 'eval':
+			print self.node2src(call), func, bounded
 		if not func:
+			return call, False
+
+		if self.isOnStack(func): # recursive call ?
 			return call, False
 
 		assert isinstance(func, ast.FunctionDef)
@@ -65,7 +71,7 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 
 			callargs = callargs + call.starargs.elts # call.starargs must be list, tuple, ...
 
-		assert len(callargs) <= len(func.args.args), 'too many arguments'
+		assert len(callargs) <= len(func.args.args), ('too many arguments', self.node2src(call))
 		callargs += [None] * (len(func.args.args) - len(callargs))
 
 		keys = []
@@ -96,7 +102,7 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		for i, arg in enumerate(callargs):
 			if arg is None:
 				defaultindex = i - (len(func.args.args) - len(func.args.defaults))
-				assert defaultindex >= 0, 'default index is %d while optimizing %s' % (defaultindex, self.node2src(call))
+				assert defaultindex >= 0, '%s: default index is %d, args=%s, defaults=%s' % (self.node2src(call), defaultindex, self.node2src(func.args.args), self.node2src(func.args.defaults))
 				defaultval = func.args.defaults[defaultindex]
 				if not self.isImmutableDefaultArg(defaultval):
 					return call, False
@@ -136,7 +142,6 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		return self.makeName(returnName, ast.Load()), assignargs + newbody
 
 	def _inlineNode(self, node, replaceNames, returnName):
-		assert isinstance(node, (list, ast.AST, bool, type(None), str, int)), type(node)
 		if isinstance(node, ast.Name) and node.id in replaceNames:
 			ctx = node.ctx
 			if isinstance(ctx, ast.Param):
