@@ -1,4 +1,5 @@
 import ast
+from collections import Counter
 
 def isnode(node):
 	return hasattr(node, '_fields')
@@ -76,6 +77,25 @@ def substmts(stmt):
 
 	return
 
+def substmtlists(stmt):
+	assert isinstance(stmt, ast.stmt)
+
+	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
+		yield stmt.body
+
+	if isinstance(stmt, ast.TryExcept):
+		for handler in stmt.handlers:
+			# ExceptHandler(expr? type, expr? name, stmt* body)
+			yield handler.body
+
+	if isinstance(stmt, (ast.For, ast.While, ast.If, ast.TryExcept)):
+		yield stmt.orelse
+
+	if isinstance(stmt, ast.TryFinally):
+		yield stmt.finalbody
+
+	return
+
 def substmts_recursive(body):
 	for ss in substmts(body):
 		for _ss in substmts_recursive(ss):
@@ -129,5 +149,30 @@ def check_missing_lineno(node):
 
 	for child in ast.iter_child_nodes(node):
 		check_missing_lineno(child)
+
+def analyzeStmtNameUsage(stmt):
+	assert isinstance(stmt, ast.stmt)
+
+	C1, C2 = Counter(), Counter()
+	if isinstance(stmt, ast.Assign):
+		for target in stmt.targets:
+			c1, c2 = analyzeExprNameUsage(expr)
+
+	elif isinstance(stmt, ast.AugAssign):
+
+	else:
+		# for other stmts, just analyze all subexprs
+		for expr in subexprs(stmt):
+			c1, c2 = analyzeExprNameUsage(expr)
+			C1 += c1
+			C2 += c2
+
+def analyzeExprNameUsage(expr):
+	assert isinstance(expr, ast.expr)
+
+
+
+
+
 
 

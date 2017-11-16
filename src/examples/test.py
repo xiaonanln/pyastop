@@ -9,6 +9,7 @@ def E(v, e=None):
 	print 'E', v
 	return e if e is not None else v
 
+E("target", [0])[0] += 1
 
 
 class A(object):
