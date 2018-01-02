@@ -156,10 +156,11 @@ def analyzeStmtNameUsage(stmt):
 	C1, C2 = Counter(), Counter()
 	if isinstance(stmt, ast.Assign):
 		for target in stmt.targets:
-			c1, c2 = analyzeExprNameUsage(expr)
+			# c1, c2 = analyzeExprNameUsage(expr)
+			pass
 
 	elif isinstance(stmt, ast.AugAssign):
-
+		pass
 	else:
 		# for other stmts, just analyze all subexprs
 		for expr in subexprs(stmt):

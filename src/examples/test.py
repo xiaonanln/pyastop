@@ -24,3 +24,8 @@ class A(object):
 			C()
 
 A.B().B()
+
+a = 1
+b = 2
+a
+b
