@@ -3,7 +3,7 @@ import ast
 import astutils
 from BaseASTOptimizer import BaseASTOptimizer
 
-class SideAffectFreeExprEliminatingASTOptimizer(BaseASTOptimizer):
+class SideEffectFreeExprEliminatingASTOptimizer(BaseASTOptimizer):
 
 	def optimize(self, node):
 		if not isinstance(node, ast.stmt): # only optimize stmt

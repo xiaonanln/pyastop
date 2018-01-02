@@ -29,3 +29,4 @@ class DeadCodeEliminatingASTOptimizer(BaseASTOptimizer):
 				return stmtlist[:i+1], True
 
 		return stmtlist, False
+

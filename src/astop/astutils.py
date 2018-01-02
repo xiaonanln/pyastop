@@ -21,10 +21,7 @@ def subexprs(node):
 			yield subnode
 
 def isexpr(node):
-	return isinstance(node, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.Lambda, ast.IfExp, ast.Dict, ast.Set,
-	                         ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp, ast.Yield, ast.Compare, ast.Call,
-	                         ast.Repr, ast.Num, ast.Str, ast.Attribute, ast.Subscript, ast.Name, ast.List, ast.Tuple
-	                         ))
+	return isinstance(node, ast.expr)
 
 def isSideEffectFreeExpr(expr):
 	assert isinstance(expr, ast.expr)
