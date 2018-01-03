@@ -3,17 +3,52 @@ import ast
 from BaseASTOptimizer import BaseASTOptimizer
 import astutils
 
+unoptimizableValue = 'unoptimizableValue'
+
+class _ReplaceVarASTOptimizer(BaseASTOptimizer):
+
+	def __init__(self, vars):
+		super(_ReplaceVarASTOptimizer, self).__init__()
+		self.vars = vars
+		self._visitingStmt = None
+
+	def visit(self, node):
+		# assert isinstance(node, ast.stmt)
+		if self._visitingStmt is None:
+			assert isinstance(node, ast.stmt)
+			self._visitingStmt = node
+
+		return super(_ReplaceVarASTOptimizer, self).visit(node)
+
+	def optimize(self, node):
+		print '_ReplaceVarASTOptimizer.optimize', self.node2src(node), self.vars
+		if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in self.vars:
+			return self.vars[node.id], True
+		else:
+			return node, False
+
+	def shouldOptimize(self, node):
+		if isinstance(node, ast.stmt) and node is not self._visitingStmt: # do not optimize into inner stmt
+			return False
+
+		return True
+
 class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 
 	RequireNameScope = True
 
-	def optimize(self, stmt):
-		if not isinstance(stmt, ast.stmt): # only optimize stmts
-			return stmt, False
+	def optimize(self, node):
+		if isinstance(node, ast.Module):
+			print 'optimize module %s' % node
+
+		if not isinstance(node, (ast.stmt, ast.mod)): # only optimize stmts
+			return node, False
+
+		stmt = node
 
 		optimized = False
 		# visit all stmt lists, which is body of functions, classes, etc ...
-		if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
+		if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.FunctionDef, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
 			stmts, opted = self.optimizeStmtList(stmt.body)
 			if opted:
 				stmt.body = stmts
@@ -60,136 +95,84 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 			return stmtlist, False
 
 	def optimizeStmt(self, stmt, assigns):
-
-
-
+		stmt, optimized = self._optimizeStmts(stmt, assigns)
 		self.visitAssignsInStmt(stmt, assigns)
+		return stmt, optimized
+
+	def _optimizeStmts(self, stmt, assigns):
+		rvopter = _ReplaceVarASTOptimizer(assigns)
+		stmt = rvopter.visit(stmt)
+		return stmt, rvopter.optimized
 
 	def visitAssignsInStmt(self, stmt, assigns):
 		if isinstance(stmt, ast.FunctionDef):
-			self.onAssignNonSideEffect(stmt.name)
+			self.onAssignName(stmt.name, unoptimizableValue, assigns)
 		elif isinstance(stmt, ast.ClassDef):
-			self.onAssignNonSideEffect(stmt.name)
+			self.onAssignName(stmt.name, unoptimizableValue, assigns)
 		elif isinstance(stmt, ast.Assign):
 			for target in stmt.targets:
-				self.visitAssignedNameInExpr(target, stmt.value)
+				self.visitAssignedNameInExpr(target, stmt.value, assigns)
 		elif isinstance(stmt, ast.Delete):
 			for expr in stmt.targets:
-				self.visitAssignedNameInExpr(expr, unresolvedName)
+				self.visitAssignedNameInExpr(expr, unoptimizableValue, assigns)
 		elif isinstance(stmt, ast.AugAssign):
-			self.visitAssignedNameInExpr(stmt.target, ast.BinOp(stmt.target, stmt.op, stmt.value)) # target op= value ==> target = target op value
+			self.visitAssignedNameInExpr(stmt.target, ast.BinOp(stmt.target, stmt.op, stmt.value), assigns) # target op= value ==> target = target op value
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
 			for alias in stmt.names:
-				self.visitAssignedNamesInAlias(alias, anyValue)
+				self.visitAssignedNamesInAlias(alias, unoptimizableValue, assigns)
 		else:
 			for substmt in astutils.substmts(stmt):
-				self.visitStmt(substmt, res)
+				self.visitAssignsInStmt(substmt, assigns)
 
-	def visitAssignedNameInExpr(self, expr, value):
+	def visitAssignedNameInExpr(self, expr, value, assigns):
 		if isinstance(expr, (ast.Attribute, ast.Subscript)):
 			pass
 		elif isinstance(expr, (ast.List, ast.Tuple)):
 			if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
 				for i, exp in enumerate(expr.elts):
-					self.visitAssignedNameInExpr(exp, value.elts[i])
+					self.visitAssignedNameInExpr(exp, value.elts[i], assigns)
 			else:
 				for exp in expr.elts:
-					self.visitAssignedNameInExpr(exp, anyValue)
+					self.visitAssignedNameInExpr(exp, unoptimizableValue, assigns)
 		elif isinstance(expr, ast.Name):
-			if not isinstance(value, PotentialValues):
-				pv = self.expr2pvs(value)
-				# print 'potential value of %s ==> %s' % (ast.dump(value), pv)
-			else:
-				pv = value # if value is PotentialValues, just keep it
-			self.onAssignName(expr, pv)
+			self.onAssignName(expr, value, assigns)
 		else:
 			assert False, ('should not assign', ast.dump(expr))
 
-	def onAssignNonSideEffectFree(self, name, assigns):
-		assert isinstance(name, ast.Name), `name`
-		print 'onAssignNonSideEffect', `name`
-		if name in assigns:
-			del assigns[name]
+	def visitAssignedNamesInAlias(self, alias, value, assigns):
+		assert isinstance(alias, ast.alias), repr(alias)
+		if alias.asname:
+			self.onAssignName(alias.asname, value, assigns)
+		else:
+			self.onAssignName(alias.name, value, assigns)
 
-	def onDelete(self, name, assigns):
-		assert isinstance(name, ast.Name), `name`
-		print 'onDelete', `name`
-		if name in assigns:
-			del assigns[name]
+	def onAssignName(self, name, value, assigns):
+		assert isinstance(name, (ast.Name, basestring)), `name`
+		if isinstance(name, ast.Name):
+			name = name.id
 
-	def onAssignSideEffectFree(self, name, value, assigns):
-		assigns[name] = name
+		if self.currentScope.isGlobalScope():
+			# don't optimize in global scope for global names matter
+			return
 
-		# if isinstance(stmt, ast.FunctionDef):
+		if not self.currentScope.isLocalName(name):
+			# can not optimize global variable
+			return
 
-		# stmt = FunctionDef(identifier
-		# name, arguments
-		# args,
-		# stmt * body, expr * decorator_list)
-		# | ClassDef(identifier
-		# name, expr * bases, stmt * body, expr * decorator_list)
-		# | Return(expr? value)
-		#
-		# | Delete(expr * targets)
-		# | Assign(expr * targets, expr
-		# value)
-		# | AugAssign(expr
-		# target, operator
-		# op, expr
-		# value)
-		#
-		# --
-		# not sure if bool is allowed, can
-		# always
-		# use
-		# int
-		# | Print(expr? dest, expr * values, bool
-		# nl)
-		#
-		# -- use
-		# 'orelse'
-		# because else is a
-		# keyword in target
-		# languages
-		# | For(expr
-		# target, expr
-		# iter, stmt * body, stmt * orelse)
-		# | While(expr
-		# test, stmt * body, stmt * orelse)
-		# | If(expr
-		# test, stmt * body, stmt * orelse)
-		# | With(expr
-		# context_expr, expr? optional_vars, stmt * body)
-		#
-		# -- 'type' is a
-		# bad
-		# name
-		# | Raise(expr? type, expr? inst, expr? tback)
-		# | TryExcept(stmt * body, excepthandler * handlers, stmt * orelse)
-		# | TryFinally(stmt * body, stmt * finalbody)
-		# | Assert(expr
-		# test, expr? msg)
-		#
-		# | Import(alias * names)
-		# | ImportFrom(identifier? module, alias * names, int? level)
-		#
-		# -- Doesn
-		# 't capture requirement that locals must be
-		# -- defined if globals is
-		# -- still
-		# supports
-		# use as a
-		# function!
-		# | Exec(expr
-		# body, expr? globals, expr? locals)
-		#
-		# | Global(identifier * names)
-		# | Expr(expr
-		# value)
-		# | Pass | Break | Continue
+		self.removeAffectedValuesByAssign( name, assigns )
 
-		return stmt, False
+		if value == unoptimizableValue:
+			if name in assigns:
+				del assigns[name]
+		else:
+			assert astutils.isexpr(value)
+			if astutils.isSideEffectFreeExpr(value):
+			# if isinstance(value, (ast.Name, ast.Num, ast.Str)):
+				assigns[name] = value
+				print self, 'assign', name, value, assigns
 
-
-
+	def removeAffectedValuesByAssign(self, name, assigns):
+		for aname, aval in assigns.items():
+			if astutils.isNameReferenced(name, aval):
+				del assigns[aname]
 

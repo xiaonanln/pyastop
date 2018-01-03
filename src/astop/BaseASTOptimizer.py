@@ -33,6 +33,9 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		if isinstance(node, ast.AST) and hasattr(node, 'lineno'):
 			self._currentNode = node
 
+		if not self.shouldOptimize(node):
+			return node
+
 		self.beforeOptimizeNode(node)
 
 		self.optimizeChildren(node) # optimize children before optimizing parent node
@@ -55,6 +58,9 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 	def currentLineno(self):
 		return self._currentNode.lineno if self._currentNode else 0
+
+	def shouldOptimize(self, node):
+		return True
 
 	# def resolveExprOptimizeWithStmts(self, node):
 	# 	# print 'resolveSubExprOptimizeWithStmts', node

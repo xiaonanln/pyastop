@@ -13,7 +13,7 @@ from simplefuncinlining import SimpleFuncInliningASTOptimizer
 from loopunfolding import LoopUnfoldingASTOptimizer
 from deadcodeeliminating import DeadCodeEliminatingASTOptimizer
 from redundantvarseliminating import RedundantVarsEliminatingASTOptimizer
-from sideeffectfreeexpreliminating import SideEffectFreeExprEliminatingASTOptimizer
+from sideeffectfreestmteliminating import SideEffectFreeStmtEliminatingASTOptimizer
 
 
 def astoptimize(sources):
@@ -65,7 +65,7 @@ def optimizeModuleAST(moduleAST, C):
 			FuncArgsUnfoldingASTOptimizer,
 			DeadCodeEliminatingASTOptimizer,
 			SimpleFuncInliningASTOptimizer,
-			SideEffectFreeExprEliminatingASTOptimizer,
+			SideEffectFreeStmtEliminatingASTOptimizer,
 			RedundantVarsEliminatingASTOptimizer,
 	):
 

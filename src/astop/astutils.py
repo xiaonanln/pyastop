@@ -54,7 +54,7 @@ def substmts(stmt):
 		for ss in stmt:
 			yield ss
 
-	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
+	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.FunctionDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
 		for ss in stmt.body:
 			yield ss
 
@@ -77,7 +77,7 @@ def substmts(stmt):
 def substmtlists(stmt):
 	assert isinstance(stmt, ast.stmt)
 
-	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
+	if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.ClassDef, ast.FunctionDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
 		yield stmt.body
 
 	if isinstance(stmt, ast.TryExcept):
@@ -168,9 +168,13 @@ def analyzeStmtNameUsage(stmt):
 def analyzeExprNameUsage(expr):
 	assert isinstance(expr, ast.expr)
 
+def isNameReferenced(name, node):
+	assert isinstance(name, basestring)
+	if isinstance(node, ast.Name) and node.id == name:
+		return True
 
+	for subnode in subnodes_recursive(node):
+		if isinstance(subnode, ast.Name) and subnode.id == name:
+			return True
 
-
-
-
-
+	return False
