@@ -21,7 +21,7 @@ class _ReplaceVarASTOptimizer(BaseASTOptimizer):
 		return super(_ReplaceVarASTOptimizer, self).visit(node)
 
 	def optimize(self, node):
-		print '_ReplaceVarASTOptimizer.optimize', self.node2src(node), self.vars
+		# print '_ReplaceVarASTOptimizer.optimize', self.node2src(node), self.vars
 		if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in self.vars:
 			return self.vars[node.id], True
 		else:
@@ -38,8 +38,8 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 	RequireNameScope = True
 
 	def optimize(self, node):
-		if isinstance(node, ast.Module):
-			print 'optimize module %s' % node
+		# if isinstance(node, ast.Module):
+		# 	print 'optimize module %s' % node
 
 		if not isinstance(node, (ast.stmt, ast.mod)): # only optimize stmts
 			return node, False
@@ -169,7 +169,7 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 			if astutils.isSideEffectFreeExpr(value):
 			# if isinstance(value, (ast.Name, ast.Num, ast.Str)):
 				assigns[name] = value
-				print self, 'assign', name, value, assigns
+				# print self, 'assign', name, value, assigns
 
 	def removeAffectedValuesByAssign(self, name, assigns):
 		for aname, aval in assigns.items():

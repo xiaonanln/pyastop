@@ -366,7 +366,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			# print 'evalConstExpr', type(v), repr(v)
 			return self.py2ast(v, ctx=ast.Load())
 		except:
-			print >>sys.stderr, 'eval const expr failed:', ast.dump(expr)
+			self.info('eval const expr failed: %s', self.node2src(expr))
 			raise
 
 
@@ -422,7 +422,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 	def _py2ast(v, ctx):
 		if isinstance(v, (int, long, float)):
 			return ast.Num(v)
-		elif isinstance(v, str):
+		elif isinstance(v, (basestring)):
 			return ast.Str(v)
 		elif isinstance(v, list):
 			return ast.List([BaseASTOptimizer._py2ast(x, ctx) for x in v], ctx)
