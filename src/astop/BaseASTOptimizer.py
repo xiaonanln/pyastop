@@ -48,6 +48,7 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			self._optimized += 1
 			node = optnode
 
+		self.fixEmptyStmtList(node)
 		if self.RequireResolveExprOptimizeWithStmts:
 			if isinstance(node, ast.stmt):
 				node = self._resolveExprOptimizeWithStmts_stmt(node)
@@ -61,6 +62,24 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 	def shouldOptimize(self, node):
 		return True
+
+	def fixEmptyStmtList(self, node):
+
+		if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
+			if not node.body:
+				print 'fixEmptyStmtList', node, node.body
+				node.body.append( self.setCurrentLocation(ast.Pass()) )
+
+		if isinstance(node, ast.TryExcept):
+			for handler in node.handlers:
+				# ExceptHandler(expr? type, expr? name, stmt* body)
+				if not handler.body:
+					node.body.append(self.setCurrentLocation(ast.Pass()))
+
+		if isinstance(node, ast.TryFinally):
+			if not node.finalbody:
+				node.finalbody.append( self.setCurrentLocation(ast.Pass()) )
+
 
 	# def resolveExprOptimizeWithStmts(self, node):
 	# 	# print 'resolveSubExprOptimizeWithStmts', node
@@ -449,27 +468,6 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 		for f in getattr(stmt, '_fields', ()):
 			if self.containsStmt(filter, getattr(stmt, f)):
-				return True
-
-		return False
-
-	def isNameReferencedBy(self, name, node):
-		if isinstance(name, ast.Name):
-			name = name.id
-
-		assert isinstance(name, str), name
-
-		if isinstance(node, list):
-			for _stmt in node:
-				if self.isNameReferencedBy(name, _stmt):
-					return True
-			return False
-
-		if isinstance(node, ast.Name) and node.id == name:
-			return True
-
-		for f in getattr(node, '_fields', ()):
-			if self.containsStmt(filter, getattr(node, f)):
 				return True
 
 		return False

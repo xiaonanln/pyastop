@@ -170,11 +170,11 @@ def analyzeExprNameUsage(expr):
 
 def isNameReferenced(name, node):
 	assert isinstance(name, basestring)
-	if isinstance(node, ast.Name) and node.id == name:
+	if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, (ast.Load, ast.AugLoad)):
 		return True
 
 	for subnode in subnodes_recursive(node):
-		if isinstance(subnode, ast.Name) and subnode.id == name:
+		if isinstance(subnode, ast.Name) and subnode.id == name and isinstance(subnode.ctx, (ast.Load, ast.AugLoad)):
 			return True
 
 	return False
