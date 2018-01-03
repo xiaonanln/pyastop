@@ -67,6 +67,7 @@ def optimizeModuleAST(moduleAST, C):
 			SimpleFuncInliningASTOptimizer,
 			RedundantVarsEliminatingASTOptimizer,
 			SideEffectFreeStmtEliminatingASTOptimizer,
+			ConstFoldingASTOptimizer,
 	):
 
 		optimizer = optimizerClass()

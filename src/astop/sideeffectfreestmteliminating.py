@@ -33,6 +33,10 @@ class SideEffectFreeStmtEliminatingASTOptimizer(BaseASTOptimizer):
 			if allTargetsEffectFree:
 				return [], True
 
+		elif isinstance(node, ast.If):
+			if not node.body and not node.orelse and astutils.isSideEffectFreeExpr(node.test):
+				return [], True
+
 		return node, False
 
 
