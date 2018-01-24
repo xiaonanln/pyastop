@@ -71,7 +71,11 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 
 			callargs = callargs + call.starargs.elts # call.starargs must be list, tuple, ...
 
-		assert len(callargs) <= len(func.args.args), ('too many arguments', self.node2src(call))
+		if len(callargs) > len(func.args.args):
+			self.fatal("too many arguments to %s function '%s': %d > %d", 'bounded' if bounded else 'unbounded', ast.dump(func),
+			           len(callargs), len(func.args.args))
+
+		# assert len(callargs) <= len(func.args.args), ('too many arguments', self.node2src(call))
 		callargs += [None] * (len(func.args.args) - len(callargs))
 
 		keys = []

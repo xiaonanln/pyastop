@@ -1,5 +1,6 @@
 import ast
 from collections import Counter
+import sys
 
 def isnode(node):
 	return hasattr(node, '_fields')
@@ -28,7 +29,7 @@ def isSideEffectFreeExpr(expr):
 	if isinstance(expr, (ast.Name, ast.Num, ast.Str)): # these expr is side-affect free
 		return True
 
-	if isinstance(expr, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.IfExp, ast.Dict, ast.Set, ast.Compare, ast.Repr, ast.List, ast.Tuple)):
+	if isinstance(expr, (ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.IfExp, ast.Compare, ast.Repr, ast.Tuple)):
 		# these exprs are side-affect free if sub-exprs are all side-effect free
 		for subexpr in subexprs(expr):
 			if not isSideEffectFreeExpr(subexpr):
@@ -141,7 +142,8 @@ def check_missing_lineno(node):
 	if not isinstance(node, ast.AST):
 		return
 
-	if isinstance(node, (ast.expr, ast.stmt, ast.excepthandler)):
+	# if isinstance(node, (ast.expr, ast.stmt, ast.excepthandler)):
+	if 'lineno' in node._attributes:
 		assert hasattr(node, 'lineno') and hasattr(node, 'col_offset'), ast.dump(node)
 
 	for child in ast.iter_child_nodes(node):
@@ -169,12 +171,15 @@ def analyzeExprNameUsage(expr):
 	assert isinstance(expr, ast.expr)
 
 def isNameReferenced(name, node):
+	# print >>sys.stderr, 'isNameReferenced', name, ast.dump(node)
 	assert isinstance(name, basestring)
-	if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, (ast.Load, ast.AugLoad)):
+	if isinstance(node, ast.Name) and node.id == name: # isinstance(node.ctx, (ast.Load, ast.AugLoad, ast.AugStore))
 		return True
 
 	for subnode in subnodes_recursive(node):
-		if isinstance(subnode, ast.Name) and subnode.id == name and isinstance(subnode.ctx, (ast.Load, ast.AugLoad)):
+		# if name == 'quality' and isinstance(node, ast.Name):
+			# print >>sys.stderr, 'check', node, node.ctx
+		if isinstance(subnode, ast.Name) and subnode.id == name: # and isinstance(subnode.ctx, (ast.Load, ast.AugLoad, ast.AugStore))
 			return True
 
 	return False

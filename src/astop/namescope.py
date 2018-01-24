@@ -276,6 +276,7 @@ class NameScope(object):
 	def getFunctionType(self, node):
 		"""Get the type of a function, which can be function | instancemethod | classmethod | staticmethod"""
 		assert isinstance(node, ast.FunctionDef)
+
 		if self.isGlobalScope():
 			return 'function'
 
@@ -419,8 +420,9 @@ class NameScope(object):
 				classdef = valuePvs.classnode
 				pvs = classdef.scope.getPotentialValues(expr.attr)
 				if isinstance(pvs, FunctionValues):
+					# print 'getPotentialValues', expr.attr, pvs
 					funcdef  = pvs.getSingleValue()
-					if funcdef:
+					if funcdef and classdef.scope.isLocalName( funcdef.name ):
 						functype = self.getFunctionType(funcdef)
 						if functype == 'instancemethod':
 							return BoundedMethodValues(funcdef)

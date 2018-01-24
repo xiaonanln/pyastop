@@ -166,10 +166,13 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 				del assigns[name]
 		else:
 			assert astutils.isexpr(value)
-			if astutils.isSideEffectFreeExpr(value):
+			# print self, 'assign', name, self.node2src(value), 'sideaffectfree', astutils.isSideEffectFreeExpr(value), 'selfref', astutils.isNameReferenced(name, value)
+			if astutils.isSideEffectFreeExpr(value) and not astutils.isNameReferenced(name, value):
 			# if isinstance(value, (ast.Name, ast.Num, ast.Str)):
 				assigns[name] = value
-				# print self, 'assign', name, value, assigns
+			else:
+				if name in assigns:
+					del assigns[name]
 
 	def removeAffectedValuesByAssign(self, name, assigns):
 		for aname, aval in assigns.items():

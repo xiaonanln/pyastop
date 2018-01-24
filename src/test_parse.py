@@ -1,11 +1,10 @@
 
 source = """
 
-a = u'abc'
-
+quality += 1
 
 """
 
 import ast
 mod = ast.parse(source, '<string>')
-print `mod.body[0].value.s`
+print `mod.body[0].target.ctx`

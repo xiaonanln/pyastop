@@ -518,6 +518,18 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		n = (stop - start + step - 1) // step
 		return n, True
 
+	def fatal(self, format, *args):
+		import traceback
+		traceback.print_stack()
+		msg = format % args
+		print >>sys.stderr, 'File "%s", line %d: %s' % (self.source, self.currentLineno(), msg)
+		print >>sys.stderr, 'fatal error occurred, quit ...'
+		exit(1)
+
+	def error(self, format, *args):
+		msg = format % args
+		print >>sys.stderr, 'File "%s", line %d: %s' % (self.source, self.currentLineno(), msg)
+
 	def info(self, format, *args):
 		msg = format % args
 		print >>sys.stderr, 'File "%s", line %d: %s' % (self.source, self.currentLineno(), msg)

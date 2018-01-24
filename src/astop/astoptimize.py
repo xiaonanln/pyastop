@@ -36,6 +36,8 @@ def astoptimize(sources):
 		# print >>sys.stderr, "%s is optimized in %d places" % (src, optimizeCount)
 
 		# print 'compile AST to code:', code
+		print >>sys.stderr, '%s is optimized, generating .pyao and .pyc ...' % (moduleAST.source, )
+
 		optCode = codegen.to_source(moduleAST)
 		optCode = '# code optimized by pyastop\n' + optCode
 
@@ -59,6 +61,7 @@ def analyzeModuleAST(moduleAST):
 
 def optimizeModuleAST(moduleAST, C):
 	optimized = False
+	print >>sys.stderr, 'Optimizing %s ...' % moduleAST.source
 	for optimizerClass in (
 			ConstFoldingASTOptimizer,
 			LoopUnfoldingASTOptimizer,
@@ -67,7 +70,7 @@ def optimizeModuleAST(moduleAST, C):
 			SimpleFuncInliningASTOptimizer,
 			RedundantVarsEliminatingASTOptimizer,
 			SideEffectFreeStmtEliminatingASTOptimizer,
-			# ConstFoldingASTOptimizer,
+			ConstFoldingASTOptimizer,
 	):
 
 		optimizer = optimizerClass()
