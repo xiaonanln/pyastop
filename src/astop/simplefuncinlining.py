@@ -72,8 +72,9 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 			callargs = callargs + call.starargs.elts # call.starargs must be list, tuple, ...
 
 		if len(callargs) > len(func.args.args):
-			self.fatal("too many arguments to %s function '%s': %d > %d", 'bounded' if bounded else 'unbounded', ast.dump(func),
+			self.error("too many arguments to %s function '%s': %d > %d", 'bounded' if bounded else 'unbounded', ast.dump(func),
 			           len(callargs), len(func.args.args))
+			return call, False
 
 		# assert len(callargs) <= len(func.args.args), ('too many arguments', self.node2src(call))
 		callargs += [None] * (len(func.args.args) - len(callargs))
@@ -106,7 +107,10 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		for i, arg in enumerate(callargs):
 			if arg is None:
 				defaultindex = i - (len(func.args.args) - len(func.args.defaults))
-				assert defaultindex >= 0, '%s: default index is %d, args=%s, defaults=%s' % (self.node2src(call), defaultindex, self.node2src(func.args.args), self.node2src(func.args.defaults))
+				if defaultindex < 0:
+					self.error('%s: default index is %d, args=%s, defaults=%s', self.node2src(call), defaultindex, self.node2src(func.args.args), self.node2src(func.args.defaults))
+					return call, False
+
 				defaultval = func.args.defaults[defaultindex]
 				if not self.isImmutableDefaultArg(defaultval):
 					return call, False

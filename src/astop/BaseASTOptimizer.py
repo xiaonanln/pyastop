@@ -436,6 +436,8 @@ class BaseASTOptimizer(ast.NodeTransformer):
 		elif isinstance(v, set):
 			assert isinstance(ctx, ast.Load)
 			return ast.Set([BaseASTOptimizer._py2ast(x, ctx) for x in v])
+		elif isinstance(v, frozenset):
+			return ast.Call( ast.Name('frozenset', ctx), [BaseASTOptimizer._py2ast(list(v), ctx), ], [], None, None)
 		elif v is None:
 			assert isinstance(ctx, ast.Load)
 			return ast.Name('None', ctx)

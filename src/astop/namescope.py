@@ -35,6 +35,10 @@ class PotentialValues(object):
 			return otherValues
 		elif self.__class__ is otherValues.__class__:
 			# values of same class, merge them
+			if isinstance(self, ClassInstanceValues):
+				return self.__class__(self.classnode) if self.classnode is otherValues.classnode else \
+						anyValue
+
 			if self.canBeAnyValue or otherValues.canBeAnyValue:
 				return self.__class__() # any value + ... = any value
 			else:
@@ -66,15 +70,11 @@ class MultipleTypeValues(PotentialValues):
 				self.addValues(_values)
 		else:
 			for existingValues in self.values:
-				foundSameClass = False
 				if existingValues.__class__ is values.__class__: # merge same type
-					self.values.remove(existingValues)
-					self.values.add( existingValues.merge(values) )
-					foundSameClass = True
+					self.values = tuple(ev for ev in self.values if ev is not existingValues) + (existingValues.merge(values), )
 					break
-
-				if not foundSameClass:
-					self.values = self.values + ( values, )
+			else:
+				self.values = self.values + ( values, )
 
 class AnyValue(PotentialValues): pass
 anyValue = AnyValue()
@@ -96,9 +96,11 @@ class UnboundedMethodValues(FunctionValues): pass
 class BoundedMethodValues(FunctionValues): pass
 
 class ClassValues(PotentialValues):
-	def __init__(self, node):
-		assert isinstance(node, ast.ClassDef)
-		super(ClassValues, self).__init__(node)
+	def __init__(self, *classnodes):
+		for classnode in classnodes:
+			assert isinstance(classnode, ast.ClassDef)
+
+		super(ClassValues, self).__init__(*classnodes)
 
 class ClassInstanceValues(PotentialValues):
 	def __init__(self, classnode, *values):
