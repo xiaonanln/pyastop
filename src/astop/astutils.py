@@ -103,7 +103,7 @@ def substmts_recursive(body):
 def subnodes_recursive(node):
 	if isinstance(node, list):
 		for sn in node:
-			for ssn in ast.iter_child_nodes(sn):
+			for ssn in subnodes_recursive(sn):
 				yield ssn
 			yield sn
 
@@ -183,3 +183,41 @@ def isNameReferenced(name, node):
 			return True
 
 	return False
+
+def substmts_no_inner(node):
+	for stmt in substmts(node):
+		if not isinstance(stmt, (ast.ClassDef, ast.FunctionDef)):
+			for _stmt in substmts_no_inner(stmt):
+				yield _stmt
+
+		yield stmt
+
+
+def subnodes_no_inner(node):
+	if isinstance(node, list):
+		for sn in node:
+			if not isinstance(node, (ast.ClassDef, ast.FunctionDef)):
+				for ssn in subnodes_no_inner(sn):
+					yield ssn
+			yield sn
+
+		return
+
+	for sn in ast.iter_child_nodes(node):
+		if not isinstance(sn, (ast.ClassDef, ast.FunctionDef)):
+			for ssn in subnodes_no_inner(sn):
+				yield ssn
+		yield sn
+
+def is_generator_func(func):
+
+	assert isinstance(func, ast.FunctionDef)
+	for node in subnodes_no_inner(func):
+		if isinstance(node, ast.Yield):
+			# print 'is_generator_func', func.name, True
+			return True
+
+	# print 'is_generator_func', func.name, False
+	return False
+
+

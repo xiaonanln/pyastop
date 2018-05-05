@@ -206,6 +206,9 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 			if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.Lambda, ast.Yield, ast.Global)): # these statements are not supported
 				return False
 
+		if astutils.is_generator_func(func):
+			return False
+
 		if not self.isReturnLastStmt(func.body):
 			return False
 
