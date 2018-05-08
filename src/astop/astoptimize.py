@@ -16,7 +16,7 @@ from redundantvarseliminating import RedundantVarsEliminatingASTOptimizer
 from sideeffectfreestmteliminating import SideEffectFreeStmtEliminatingASTOptimizer
 
 
-def astoptimize(sources):
+def astoptimize(sources, replace_py=False):
 	print >>sys.stderr, 'ast optimizeing %d sources ...' % len(sources)
 	moduleASTs = [compileutils.compileModuleAST(src) for src in sources]
 	for src, module in zip(sources, moduleASTs):
@@ -40,8 +40,8 @@ def astoptimize(sources):
 
 		optCode = codegen.to_source(moduleAST)
 		optCode = '# code optimized by pyastop\n' + optCode
-
-		with open(src  + 'ao', 'wb') as outputfd:
+		src_ao = src  + 'ao' if not replace_py else src
+		with open(src_ao, 'wb') as outputfd:
 			outputfd.write(optCode)
 
 		checkExprContext(moduleAST)

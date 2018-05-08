@@ -486,8 +486,8 @@ for k in consts.BUILTIN_NAMES:
 	else:
 		builtinsNameScope.onAssignName(k, BuiltinValues(getattr(__builtin__, k)))
 
-for k, v in builtinsNameScope.locals.iteritems():
-	print "BUILTIN %s = %s" % (k, v)
+# for k, v in builtinsNameScope.locals.iteritems():
+# 	print "BUILTIN %s = %s" % (k, v)
 
 def newGlobalNameScope(module):
 	assert isinstance(module, ast.Module)
