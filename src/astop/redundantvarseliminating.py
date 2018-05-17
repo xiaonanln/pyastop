@@ -1,89 +1,85 @@
 
 import ast
 from BaseASTOptimizer import BaseASTOptimizer
+from BaseSkipInnerASTOptimizer import BaseSkipInnerASTOptimizer
 import astutils
 
 unoptimizableValue = 'unoptimizableValue'
 
-class _ReplaceVarASTOptimizer(BaseASTOptimizer):
+class _ReplaceVarASTOptimizer(BaseSkipInnerASTOptimizer):
 
 	def __init__(self, vars):
 		super(_ReplaceVarASTOptimizer, self).__init__()
+		assert vars, vars
 		self.vars = vars
-		self._visitingStmt = None
-
-	def visit(self, node):
-		# assert isinstance(node, ast.stmt)
-		if self._visitingStmt is None:
-			assert isinstance(node, ast.stmt)
-			self._visitingStmt = node
-
-		return super(_ReplaceVarASTOptimizer, self).visit(node)
 
 	def optimize(self, node):
-		# print '_ReplaceVarASTOptimizer.optimize', self.node2src(node), self.vars
+		print '_ReplaceVarASTOptimizer.optimize', self.node2src(node), self.vars
+		if isinstance(node, ast.Assign) and len(node.targets) == 1:
+			expr = node.targets[0]
+			if isinstance(expr, ast.Name) and expr.id in self.vars:
+				return None, True
+
+		if isinstance(node, ast.Expr) and isinstance(node.value, ast.Name) and node.value.id in self.vars:
+			return None, True
+
 		if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in self.vars:
+			# print 'replacing %s with %s' % (node.id, self.node2str(self.vars[node.id]))
 			return self.vars[node.id], True
-		else:
-			return node, False
 
-	def shouldOptimize(self, node):
-		if isinstance(node, ast.stmt) and node is not self._visitingStmt: # do not optimize into inner stmt
-			return False
+		return node, False
 
-		return True
+	# def shouldOptimize(self, node):
+	# 	return True
 
 class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 
 	RequireNameScope = True
 
-	def optimize(self, node):
-		# if isinstance(node, ast.Module):
-		# 	print 'optimize module %s' % node
+	def __init__(self):
+		super(RedundantVarsEliminatingASTOptimizer, self).__init__()
+		self.scopeAssigns = {} # {scope : assigns}
 
-		if not isinstance(node, (ast.stmt, ast.mod)): # only optimize stmts
-			return node, False
+	def getAssigns(self, scope):
+		assert not scope.isGlobalScope(), scope
+		if scope not in self.scopeAssigns:
+			self.scopeAssigns[scope] = {}
 
-		stmt = node
+		return self.scopeAssigns[scope]
 
-		optimized = False
-		# visit all stmt lists, which is body of functions, classes, etc ...
-		if isinstance(stmt, (ast.Module, ast.Interactive, ast.Suite, ast.FunctionDef, ast.ClassDef, ast.For, ast.While, ast.If, ast.TryExcept, ast.TryFinally)):
-			stmts, opted = self.optimizeStmtList(stmt.body)
-			if opted:
-				stmt.body = stmts
-				optimized = True
+	def shouldOptimize(self, node):
+		return True
 
-		if isinstance(stmt, ast.TryExcept):
-			for handler in stmt.handlers:
-				# ExceptHandler(expr? type, expr? name, stmt* body)
-				stmts, opted = self.optimizeStmtList(handler.body)
-				if opted:
-					handler.body = stmts
-					optimized = True
+	def optimize(self, func):
+		if not isinstance(func, ast.FunctionDef):
+			return func, False
 
-		if isinstance(stmt, (ast.For, ast.While, ast.If, ast.TryExcept)):
-			stmts, opted = self.optimizeStmtList(stmt.orelse)
-			if opted:
-				stmt.orelse = stmts
-				optimized = True
+		print 'optimize func %s' % func.name
+		aliases = self.analyzeAliases(func)
+		replaceVars = {k: v for k, v in aliases.iteritems() if v is not unoptimizableValue}
+		print 'aliases', aliases, 'replaceVars', replaceVars
+		newbody, opt = self.optimizeStmtList(func.body, replaceVars)
+		if opt:
+			func.body = newbody
+		return func, opt
 
-		if isinstance(stmt, ast.TryFinally):
-			stmts, opted = self.optimizeStmtList(stmt.finalbody)
-			if opted:
-				stmt.finalbody = stmts
-				optimized = True
+	def analyzeAliases(self, func):
+		assert isinstance(func, ast.FunctionDef)
+		aliases = {}
+		for stmt in astutils.substmts_no_inner(func):
+			self.visitAssignsInStmt(stmt, aliases)
 
-		return stmt, optimized
+		return aliases
 
-	def optimizeStmtList(self, stmtlist):
+	def optimizeStmtList(self, stmtlist, replaceVars):
+		if not replaceVars:
+			return stmtlist, False
 
-		assigns = {}
 		optimized = False
 		newstmtlist = []
 
 		for stmt in stmtlist:
-			stmt, opted = self.optimizeStmt(stmt, assigns)
+			stmt, opted = self.optimizeStmt(stmt, replaceVars)
 			if stmt is not None:
 				newstmtlist.append(stmt)
 			if opted:
@@ -94,13 +90,13 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 		else:
 			return stmtlist, False
 
-	def optimizeStmt(self, stmt, assigns):
-		stmt, optimized = self._optimizeStmts(stmt, assigns)
-		self.visitAssignsInStmt(stmt, assigns)
-		return stmt, optimized
+	def optimizeStmt(self, stmt, replaceVars):
+		if not replaceVars:
+			return stmt, False
 
-	def _optimizeStmts(self, stmt, assigns):
-		rvopter = _ReplaceVarASTOptimizer(assigns)
+		print 'optimize %s with aliases %s' % (stmt.__class__.__name__, replaceVars)
+		rvopter = _ReplaceVarASTOptimizer(replaceVars)
+
 		stmt = rvopter.visit(stmt)
 		return stmt, rvopter.optimized
 
@@ -120,9 +116,6 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 		elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
 			for alias in stmt.names:
 				self.visitAssignedNamesInAlias(alias, unoptimizableValue, assigns)
-		else:
-			for substmt in astutils.substmts(stmt):
-				self.visitAssignsInStmt(substmt, assigns)
 
 	def visitAssignedNameInExpr(self, expr, value, assigns):
 		if isinstance(expr, (ast.Attribute, ast.Subscript)):
@@ -151,9 +144,11 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 		if isinstance(name, ast.Name):
 			name = name.id
 
-		if self.currentScope.isGlobalScope():
-			# don't optimize in global scope for global names matter
-			return
+		# if not name.startswith('_pyastop_'):
+		# 	# only eliminate _pyastop_ variables
+		# 	return
+
+		assert not self.currentScope.isGlobalScope()
 
 		if not self.currentScope.isLocalName(name):
 			# can not optimize global variable
@@ -162,8 +157,10 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 		self.removeAffectedValuesByAssign( name, assigns )
 
 		if value == unoptimizableValue:
-			if name in assigns:
-				del assigns[name]
+			assigns[name] = unoptimizableValue
+		elif name in assigns:
+			# name assigned multiples, we can not optimize it
+			assigns[name] = unoptimizableValue
 		else:
 			assert astutils.isexpr(value)
 			# print self, 'assign', name, self.node2src(value), 'sideaffectfree', astutils.isSideEffectFreeExpr(value), 'selfref', astutils.isNameReferenced(name, value)
@@ -171,11 +168,13 @@ class RedundantVarsEliminatingASTOptimizer(BaseASTOptimizer):
 			# if isinstance(value, (ast.Name, ast.Num, ast.Str)):
 				assigns[name] = value
 			else:
-				if name in assigns:
-					del assigns[name]
+				assigns[name] = unoptimizableValue
 
 	def removeAffectedValuesByAssign(self, name, assigns):
 		for aname, aval in assigns.items():
+			if aval is unoptimizableValue:
+				continue
+
 			if astutils.isNameReferenced(name, aval):
-				del assigns[aname]
+				assigns[aname] = unoptimizableValue
 

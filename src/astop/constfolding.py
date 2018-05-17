@@ -25,8 +25,15 @@ class ConstFoldingASTOptimizer(BaseASTOptimizer):
 					if not ok or rangelen >= 100:
 						return node, False
 
-			node = self.evalConstExpr(node)
-			return node, True
+			try:
+				node = self.evalConstExpr(node)
+			except:
+				self.error('eval const expr failed: %s', self.node2src(node))
+				return node, False
+			else:
+				return node, True
+
+
 
 		return node, False
 

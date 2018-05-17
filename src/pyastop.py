@@ -6,6 +6,7 @@ import astop
 import os
 import ast
 from astop import codegen
+import compileall
 
 # c = ast.parse("with a as b: print b", "noname")
 # print dir(c)
@@ -31,6 +32,11 @@ def main():
 	for dir in args.directory or []:
 		sources += getSourcesInDirectory(dir, exclude_directories=exclude_directories)
 
+	if args.compileall:
+		print >>sys.stderr, 'Compiling %d sources ...' % len(sources)
+		for fn in sources:
+			compileall.compile_file(fn, force=1, quiet=1)
+
 	if args.listfiles:
 		for src in sources:
 			print src
@@ -51,6 +57,7 @@ def parseArgs(args):
 	parser.add_argument('-d', '--directory', metavar="<dir>", type=str, nargs='*', help="specify input source directory")
 	parser.add_argument('-xd', '--exclude-directory', metavar="<exc_dir>", type=str, nargs='*', help="specify source directory to exclude")
 	parser.add_argument('--listfiles', '-listfiles', action='store_true', help='just list files to be optimized, but not optimize it')
+	parser.add_argument('--compileall', '-compileall', action='store_true', help='compile all when started')
 	parser.add_argument('--replace-py', action='store_true', help='replace *.py with optimized version (DANGEROUS!)')
 	parser.add_argument('sources', metavar="<sources>", type=str, nargs='*', help="input source files")
 	return parser.parse_args(args)

@@ -40,21 +40,24 @@ class BaseASTOptimizer(ast.NodeTransformer):
 
 		self.optimizeChildren(node) # optimize children before optimizing parent node
 		# print 'optimizing ', self.node2src(node),
+		origNode = node
 		optnode, optimized = self.optimize(node)
 		# assert not isinstance(optnode, list), self.node2src(optnode)
-		assert optnode is not None
+		# assert optnode is not None
 		if optimized:
 			print >>sys.stderr, """%s: File "%s", line %d, %s ==> %s""" % (self.__class__.__name__, self.source, self.currentLineno(), self.node2src(node), self.node2src(optnode))
 			self._optimized += 1
 			node = optnode
 
-		self.fixEmptyStmtList(node)
-		if self.RequireResolveExprOptimizeWithStmts:
-			if isinstance(node, ast.stmt):
-				node = self._resolveExprOptimizeWithStmts_stmt(node)
+		if node:
+			self.fixEmptyStmtList(node)
+			if self.RequireResolveExprOptimizeWithStmts:
+				if isinstance(node, ast.stmt):
+					node = self._resolveExprOptimizeWithStmts_stmt(node)
 
-		assert node is not None
-		self.afterOptimizeNode(node)
+			assert node is not None
+
+		self.afterOptimizeNode(node, origNode)
 		return node
 
 	def currentLineno(self):
@@ -319,13 +322,13 @@ class BaseASTOptimizer(ast.NodeTransformer):
 			# 	self.currentScope = namescope.NameScope(node, self.currentScope)
 			# 	self.currentScope.visitFunctionBody(node)
 
-	def afterOptimizeNode(self, node):
+	def afterOptimizeNode(self, node, origNode):
 		if self.requireNameScopes():
-			if isinstance(node, ast.Module):
+			if isinstance(origNode, ast.Module):
 				self.currentScope = self.currentScope.parent
-			elif isinstance(node, ast.ClassDef):
+			elif isinstance(origNode, ast.ClassDef):
 				self.currentScope = self.currentScope.parent
-			elif isinstance(node, ast.FunctionDef):
+			elif isinstance(origNode, ast.FunctionDef):
 				self.currentScope = self.currentScope.parent
 
 	def isOnStack(self, node):
@@ -477,6 +480,8 @@ class BaseASTOptimizer(ast.NodeTransformer):
 	def node2src(self, node):
 		if isinstance(node, list):
 			return "[" + ", ".join(map(self.node2src, node)) + "]"
+		elif node is None:
+			return '<none>'
 
 		return codegen.to_source(node)
 

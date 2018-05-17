@@ -145,6 +145,9 @@ class SimpleFuncInliningASTOptimizer(BaseASTOptimizer):
 		# step 1: replace all locals in called function
 		# replace all names in stmts
 		newbody = [self._inlineNode(stmt, replaceNames, returnName) for stmt in func.body]
+		if not newbody or not isinstance(newbody[-1], ast.Return):
+			returnNoneStmt = ast.Return()
+			newbody.append(self._inlineNode(returnNoneStmt, replaceNames, returnName))
 		for stmt in newbody:
 			astutils.check_missing_lineno(stmt)
 		return self.makeName(returnName, ast.Load()), assignargs + newbody
